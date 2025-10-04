@@ -13,7 +13,7 @@ pynput
 vgamepad
 
 PyQt6
-
+ 
 
 To permanently change settings, edit treadmill.py and change the vaules between the dashes near the top.
 
