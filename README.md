@@ -7,9 +7,12 @@ to bind the virtual gamepad using steam input, open the script in a text editor 
 
 
 REQUIRED: 
-pynput, 
-vgamepad, 
-PyQt6 
+
+pip install pynput
+
+pip install vgamepad
+
+pip install PyQt6
 
 To permanently change settings, edit treadmill.py and change the vaules between the dashes near the top.
 
