@@ -9,6 +9,9 @@ class CurveEditorWindow(QWidget):
         self.setWindowTitle("Sensitivity Curve Editor")
         self.setMinimumSize(500, 500)
 
+        self.curve_mapping = []
+        self.dirty = True
+
         self.margin = 40  # Padding around graph
         self.graph_width = 400
         self.graph_height = 400
@@ -77,30 +80,33 @@ class CurveEditorWindow(QWidget):
             pos = event.position()
             x = self.points[self.dragging_point_index].x()  # Lock X position
             y = min(
-                max(pos.y(), self.margin), self.margin + self.graph_height
-            )  # Clamp within vertical graph bounds
+                max(pos.y(), self.margin),
+                self.margin + self.graph_height,
+            )
             self.points[self.dragging_point_index] = QPointF(x, y)
+            self.dirty = True  # Mark LUT as dirty
             self.update()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         self.dragging_point_index = None
 
-    def get_curve_mapping(self):
+    def get_or_build_curve_mapping(self):
+        if self.dirty:
+            self.curve_mapping = self.build_curve_mapping()
+            self.dirty = False
+        return self.curve_mapping
+
+    def build_curve_mapping(self):
         """
-        Returns list of (input, output) points
-        input: 0..32767 (based on X position of control points)
-        output: 0..32767 (based on Y position of control points, flipped so top = max)
+        Returns list of (input, output) points.
+        Called internally when curve is marked dirty.
         """
         mapping = []
         for p in self.points:
-            # X: from graph space (left to right) to 0..32767
             input_x = ((p.x() - self.margin) / self.graph_width) * 32767
-
-            # Y: from graph space (bottom to top) to 0..32767
             output_y = (
                 ((self.margin + self.graph_height) - p.y()) / self.graph_height * 32767
             )
-
             mapping.append((int(input_x), int(output_y)))
         return mapping
 

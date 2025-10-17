@@ -157,9 +157,8 @@ class MainWindow(QWidget):
 
             use_curve = hasattr(self, "curveWindow") and self.curveWindow.isVisible()
             if use_curve:
-                output_magnitude = self.interpolate_curve(
-                    scaled_input, self.curveWindow.get_curve_mapping()
-                )
+                curve_lut = self.curveWindow.get_or_build_curve_mapping()
+                output_magnitude = self.interpolate_curve(scaled_input, curve_lut)
             else:
                 output_magnitude = scaled_input
 
