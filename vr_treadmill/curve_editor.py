@@ -68,8 +68,10 @@ class CurveEditorWindow(QWidget):
             if y is not None:
                 painter.setBrush(QColor("green"))
                 painter.setPen(QPen(Qt.GlobalColor.green))
-                painter.drawEllipse(QPointF(x, y), self.point_radius / 2, self.point_radius / 2)
-    
+                painter.drawEllipse(
+                    QPointF(x, y), self.point_radius / 2, self.point_radius / 2
+                )
+
     def clear_current_input(self):
         self.current_input = None
         self.update()
@@ -165,7 +167,7 @@ class CurveEditorWindow(QWidget):
 
         dist = ((px - closest_x) ** 2 + (py - closest_y) ** 2) ** 0.5
         return dist < tolerance
-    
+
     def set_current_input(self, input_value: int) -> None:
         self.current_input = input_value
         self.update()
