@@ -17,7 +17,7 @@ mouse = Controller()
 enabled = False
 keyToggle = False
 aKey = Key.alt_gr
-aKeyToggle = False  # Whether we're waiting for the user to press a key to bind
+aKeyToggle = False
 
 # -------------------------------------------------------------------
 sensitivity = 400  # How sensitive the joystick will be
@@ -185,6 +185,7 @@ def onPress(key):
             print("A key held:", key)
             gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
             gamepad.update()
+
 
 def onRelease(key):
     global enabled
