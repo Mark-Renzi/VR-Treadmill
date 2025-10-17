@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QLineEdit,
     QLabel,
-    QCheckBox
+    QCheckBox,
 )
 import vgamepad as vg
 from vr_treadmill.curve_editor import CurveEditorWindow
@@ -17,9 +17,15 @@ from vr_treadmill.curve_editor import CurveEditorWindow
 gamepad = vg.VX360Gamepad()
 mouse = Controller()
 enabled = False
+
 keyToggle = False
+
 aKey = Key.alt_gr
 aKeyToggle = False
+
+recenterEnabled = True
+recenterToggleKey = Key.f9
+recenterKeyToggle = False
 
 # -------------------------------------------------------------------
 sensitivity = 400  # How sensitive the joystick will be
@@ -43,7 +49,7 @@ class JoystickWorker(QtCore.QThread):
         self.running = False
 
     def run(self):
-        global sensitivity, pollRate, window
+        global sensitivity, pollRate, window, recenterEnabled
 
         while enabled and not keyToggle:
             cycle_start = time.perf_counter()
@@ -54,7 +60,9 @@ class JoystickWorker(QtCore.QThread):
             # Emit signal to update the curve editor with current input
             self.update_input.emit(min(int(scaled_input), 32767))
 
-            use_curve = hasattr(window, "curveWindow") and window.curveWindow.isVisible()
+            use_curve = (
+                hasattr(window, "curveWindow") and window.curveWindow.isVisible()
+            )
             show_dot = window.showDotCheckbox.isChecked()
 
             if use_curve:
@@ -75,7 +83,8 @@ class JoystickWorker(QtCore.QThread):
                 mousey = 0
 
             clamped_mousey = max(-32768, min(32767, mousey))
-            mouse.position = (700, 500)
+            if recenterEnabled:
+                mouse.position = (700, 500)
             print("Joystick y:", clamped_mousey)
 
             gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
@@ -101,10 +110,15 @@ class MainWindow(QWidget):
         self.setKeyButton = QPushButton("Set Stop Key")
         self.setKeyButton.clicked.connect(self.setKey)
 
-        self.setAKeyButton = QPushButton("Set A Key")
+        self.setAKeyButton = QPushButton("Set A Button Key")
         self.setAKeyButton.clicked.connect(self.setAKey)
 
         self.aKeyLabel = QLabel(f"A Button Key: {aKey}")
+
+        self.setRecenterKeyButton = QPushButton("Set Recenter Toggle Key")
+        self.setRecenterKeyButton.clicked.connect(self.setRecenterKey)
+
+        self.recenterKeyLabel = QLabel(f"Recenter Toggle Key: {recenterToggleKey}")
 
         pollLabel = QLabel("Polling Rate (/sec):")
         senseLabel = QLabel("Sensitivity:")
@@ -132,6 +146,8 @@ class MainWindow(QWidget):
         layout.addWidget(self.setKeyButton)
         layout.addWidget(self.aKeyLabel)
         layout.addWidget(self.setAKeyButton)
+        layout.addWidget(self.recenterKeyLabel)
+        layout.addWidget(self.setRecenterKeyButton)
         layout.addWidget(self.openCurveEditorButton)
         layout.addWidget(self.showDotCheckbox)
 
@@ -141,9 +157,13 @@ class MainWindow(QWidget):
         # Input validation tracking
         self.validSensitivity = True
         self.validPollRate = True
-    
+
     def update_curve_input(self, input_value: int):
-        if hasattr(self, "curveWindow") and self.curveWindow.isVisible() and self.showDotCheckbox.isChecked():
+        if (
+            hasattr(self, "curveWindow")
+            and self.curveWindow.isVisible()
+            and self.showDotCheckbox.isChecked()
+        ):
             self.curveWindow.set_current_input(input_value)
 
     def updateStartButton(self):
@@ -232,9 +252,29 @@ class MainWindow(QWidget):
         else:
             return curve[-1][1]
 
+    def setRecenterKey(self):
+        global recenterToggleKey, recenterKeyToggle
+        if not recenterKeyToggle:
+            self.recenterKeyLabel.setText("PRESS ANY KEY")
+            self.setRecenterKeyButton.setText("Confirm?")
+            print("Listening for recenter toggle key...")
+            recenterKeyToggle = True
+        else:
+            self.recenterKeyLabel.setText(f"Recenter Toggle Key: {recenterToggleKey}")
+            self.setRecenterKeyButton.setText("Set Recenter Toggle Key")
+            print("Recenter toggle key confirmed.")
+            recenterKeyToggle = False
+
 
 def onPress(key):
-    global enabled, keyToggle, quitKey, aKeyToggle, aKey
+    global \
+        enabled, \
+        keyToggle, \
+        quitKey, \
+        aKeyToggle, \
+        aKey, \
+        recenterToggleKey, \
+        recenterEnabled
     if keyToggle:
         print("Stop key will be", str(key))
         quitKey = key
@@ -253,6 +293,12 @@ def onPress(key):
             print("A key held:", key)
             gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
             gamepad.update()
+        elif recenterKeyToggle:
+            print("Recenter toggle key will be", str(key))
+            recenterToggleKey = key
+        elif key == recenterToggleKey:
+            recenterEnabled = not recenterEnabled
+            print(f"Mouse recentering {'enabled' if recenterEnabled else 'disabled'}")
 
 
 def onRelease(key):
