@@ -1,6 +1,11 @@
 # VR-Treadmill
 Script that converts mouse movement into joystick movement for a VR treadmill.
 
+This version adds some more features, including sensitivity remapping.
+
+<img width="480" height="434" alt="image" src="https://github.com/user-attachments/assets/0943172c-6350-423d-9f11-d5af8895bde8" />
+
+
 ## Install Process
 
 You can install with pip or uv. If you're going to develop, use uv, but it's not required.
