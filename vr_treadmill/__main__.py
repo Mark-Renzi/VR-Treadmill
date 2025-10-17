@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QLineEdit,
     QLabel,
+    QCheckBox
 )
 import vgamepad as vg
 from vr_treadmill.curve_editor import CurveEditorWindow
@@ -27,9 +28,58 @@ quitKey = Key.ctrl_r  # Which key will stop the program
 # -------------------------------------------------------------------
 
 
+class JoystickWorker(QtCore.QThread):
+    update_input = QtCore.pyqtSignal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.running = False
+
+    def start_loop(self):
+        self.running = True
+        self.start()
+
+    def stop_loop(self):
+        self.running = False
+
+    def run(self):
+        global sensitivity, pollRate
+
+        while self.running:
+            cycle_start = time.perf_counter()
+            current_sensitivity = sensitivity
+            delta_y = mouse.position[1] - 500
+            scaled_input = abs(delta_y) * current_sensitivity
+
+            # Emit signal to update the curve editor with current input
+            self.update_input.emit(min(int(scaled_input), 32767))
+
+            # Use the curve editor to transform the input (in main thread)
+            if delta_y > 0:
+                mousey = -int(scaled_input)
+            elif delta_y < 0:
+                mousey = int(scaled_input)
+            else:
+                mousey = 0
+
+            clamped_mousey = max(-32768, min(32767, mousey))
+            mouse.position = (700, 500)
+            print("Joystick y:", clamped_mousey)
+
+            gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
+            gamepad.update()
+
+            elapsed = time.perf_counter() - cycle_start
+            sleep_time = max(0, (1 / pollRate) - elapsed)
+            time.sleep(sleep_time)
+
+
 class MainWindow(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.worker = JoystickWorker()
+        self.worker.update_input.connect(self.update_curve_input)
 
         self.setWindowTitle("Maratron")
 
@@ -58,6 +108,8 @@ class MainWindow(QWidget):
         self.openCurveEditorButton = QPushButton("Edit Sensitivity Curve")
         self.openCurveEditorButton.clicked.connect(self.openCurveEditor)
 
+        self.showDotCheckbox = QCheckBox("Show Input on Curve")
+
         layout = QVBoxLayout()
         layout.addWidget(self.startJoy)
         layout.addWidget(senseLabel)
@@ -69,6 +121,7 @@ class MainWindow(QWidget):
         layout.addWidget(self.aKeyLabel)
         layout.addWidget(self.setAKeyButton)
         layout.addWidget(self.openCurveEditorButton)
+        layout.addWidget(self.showDotCheckbox)
 
         self.setLayout(layout)
         self.show()
@@ -76,6 +129,10 @@ class MainWindow(QWidget):
         # Input validation tracking
         self.validSensitivity = True
         self.validPollRate = True
+    
+    def update_curve_input(self, input_value: int):
+        if hasattr(self, "curveWindow") and self.curveWindow.isVisible() and self.showDotCheckbox.isChecked():
+            self.curveWindow.set_current_input(input_value)
 
     def updateStartButton(self):
         self.startJoy.setEnabled(self.validSensitivity and self.validPollRate)
@@ -140,42 +197,9 @@ class MainWindow(QWidget):
             keyToggle = False
 
     def run(self):
-        global enabled
-        global keyToggle
+        global enabled, keyToggle
         enabled = True
-
-        while enabled and not keyToggle:
-            cycle_start = time.perf_counter()
-            current_sensitivity = sensitivity  # Read latest value
-
-            delta_y = mouse.position[1] - 500
-            scaled_input = abs(delta_y) * current_sensitivity
-
-            use_curve = hasattr(self, "curveWindow") and self.curveWindow.isVisible()
-            if use_curve:
-                curve_lut = self.curveWindow.get_or_build_curve_mapping()
-                output_magnitude = self.interpolate_curve(scaled_input, curve_lut)
-            else:
-                output_magnitude = scaled_input
-
-            if delta_y > 0:
-                mousey = -int(output_magnitude)
-            elif delta_y < 0:
-                mousey = int(output_magnitude)
-            else:
-                mousey = 0
-
-            clamped_mousey = max(-32768, min(32767, mousey))
-            mouse.position = (700, 500)
-
-            print("Joystick y:", clamped_mousey)
-
-            gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
-            gamepad.update()
-
-            elapsed = time.perf_counter() - cycle_start
-            sleep_time = max(0, (1 / pollRate) - elapsed)
-            time.sleep(sleep_time)
+        self.worker.start_loop()
 
     def openCurveEditor(self):
         self.curveWindow = CurveEditorWindow()
@@ -198,12 +222,7 @@ class MainWindow(QWidget):
 
 
 def onPress(key):
-    global enabled
-    global keyToggle
-    global quitKey
-    global aKeyToggle
-    global aKey
-
+    global enabled, keyToggle, quitKey, aKeyToggle, aKey
     if keyToggle:
         print("Stop key will be", str(key))
         quitKey = key
@@ -213,6 +232,10 @@ def onPress(key):
     elif enabled:
         if key == quitKey:
             enabled = False
+            window.worker.stop_loop()
+            if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
+                window.curveWindow.clear_current_input()
+
             print("Stopped with", quitKey)
         elif key == aKey:
             print("A key held:", key)

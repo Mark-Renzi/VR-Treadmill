@@ -19,6 +19,8 @@ class CurveEditorWindow(QWidget):
         self.point_radius = 6
         self.dragging_point_index = None
 
+        self.current_input: int | None = None
+
         # Initialize control points: fixed endpoints
         self.points = [
             QPointF(self.margin, self.margin + self.graph_height),
@@ -56,6 +58,21 @@ class CurveEditorWindow(QWidget):
             self.margin + self.graph_height + 30,
             "Left-click + drag to move. Double-click to add. Right-click to delete.",
         )
+
+        if self.current_input is not None:
+            x = self.margin + (self.current_input / 32767) * self.graph_width
+
+            # Interpolate Y position based on self.points
+            y = self.interpolate_y_from_points(self.current_input)
+
+            if y is not None:
+                painter.setBrush(QColor("green"))
+                painter.setPen(QPen(Qt.GlobalColor.green))
+                painter.drawEllipse(QPointF(x, y), self.point_radius / 2, self.point_radius / 2)
+    
+    def clear_current_input(self):
+        self.current_input = None
+        self.update()
 
     def mousePressEvent(self, event: QMouseEvent):
         pos = event.position()
@@ -148,6 +165,26 @@ class CurveEditorWindow(QWidget):
 
         dist = ((px - closest_x) ** 2 + (py - closest_y) ** 2) ** 0.5
         return dist < tolerance
+    
+    def set_current_input(self, input_value: int) -> None:
+        self.current_input = input_value
+        self.update()
+
+    def interpolate_y_from_points(self, input_val: int) -> float | None:
+        """Given an input value (0-32767), return the Y position for the green dot."""
+        px = self.margin + (input_val / 32767) * self.graph_width
+
+        for i in range(len(self.points) - 1):
+            x1 = self.points[i].x()
+            x2 = self.points[i + 1].x()
+            y1 = self.points[i].y()
+            y2 = self.points[i + 1].y()
+
+            if x1 <= px <= x2:
+                t = (px - x1) / (x2 - x1)
+                return y1 + t * (y2 - y1)
+
+        return None
 
 
 if __name__ == "__main__":
