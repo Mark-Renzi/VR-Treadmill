@@ -16,6 +16,8 @@ gamepad = vg.VX360Gamepad()
 mouse = Controller()
 enabled = True
 keyToggle = False
+aKey = Key.alt_gr
+aKeyToggle = False  # Whether we're waiting for the user to press a key to bind
 
 # -------------------------------------------------------------------
 sensitivity = 400  # How sensitive the joystick will be
@@ -36,10 +38,15 @@ class MainWindow(QWidget):
         self.setKeyButton = QPushButton("Set Stop Key")
         self.setKeyButton.clicked.connect(self.setKey)
 
+        self.setAKeyButton = QPushButton("Set A Key")
+        self.setAKeyButton.clicked.connect(self.setAKey)
+
+        self.aKeyLabel = QLabel(f"A Button Key: {aKey}")
+
         pollLabel = QLabel("Polling Rate (/sec):")
         senseLabel = QLabel("Sensitivity:")
 
-        self.keyLabel = QLabel("Stop Key: " + str(quitKey))
+        self.keyLabel = QLabel(f"Stop Key: {quitKey}")
 
         self.pollRateLine = QLineEdit(str(pollRate))
         self.pollRateLine.textChanged.connect(self.setPollingRate)
@@ -55,6 +62,8 @@ class MainWindow(QWidget):
         layout.addWidget(self.pollRateLine)
         layout.addWidget(self.keyLabel)
         layout.addWidget(self.setKeyButton)
+        layout.addWidget(self.aKeyLabel)
+        layout.addWidget(self.setAKeyButton)
 
         self.setLayout(layout)
         self.show()
@@ -93,6 +102,23 @@ class MainWindow(QWidget):
             self.validSensitivity = False
             print("Invalid sensitivity")
         self.updateStartButton()
+
+    def setAKey(self):
+        global aKey
+        global aKeyToggle
+        if not aKeyToggle:
+            self.aKeyLabel.setText("PRESS ANY KEY")
+            self.setAKeyButton.setText("Confirm?")
+            print("Listening for A key bind...")
+            aKeyToggle = True
+        else:
+            if aKey:
+                self.aKeyLabel.setText("A Button Key: " + str(aKey))
+            else:
+                self.aKeyLabel.setText("A Button Key: Not set")
+            self.setAKeyButton.setText("Set A Key")
+            print("A Key binding confirmed.")
+            aKeyToggle = False
 
     def setKey(self):
         global quitKey
@@ -142,15 +168,35 @@ def onPress(key):
     global enabled
     global keyToggle
     global quitKey
+    global aKeyToggle
+    global aKey
+
     if keyToggle:
         print("Stop key will be", str(key))
         quitKey = key
-    elif key == quitKey:
-        enabled = False
-        print("Stopped with", quitKey)
+    elif aKeyToggle:
+        print("A key will be", str(key))
+        aKey = key
+    elif enabled:
+        if key == quitKey:
+            enabled = False
+            print("Stopped with", quitKey)
+        elif key == aKey:
+            print("A key held:", key)
+            gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+            gamepad.update()
+
+def onRelease(key):
+    global enabled
+    global aKey
+
+    if enabled and key == aKey:
+        print("A key released:", key)
+        gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+        gamepad.update()
 
 
-listener = Listener(on_press=onPress)
+listener = Listener(on_press=onPress, on_release=onRelease)
 listener.start()
 
 app = QApplication([])
