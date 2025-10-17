@@ -146,20 +146,22 @@ class MainWindow(QWidget):
         mousey1 = 0
         mousey2 = 0
 
-        if hasattr(self, "curveWindow"):
-            curve = self.curveWindow.get_curve_mapping()
-        else:
-            curve = [(0, 0), (sensitivity, 32767)]
-
         while enabled and not keyToggle:
+            cycle_start = time.perf_counter()
+            current_sensitivity = sensitivity  # Read latest value
             mousey2 = mousey1
             mousey1 = 0
 
             delta_y = mouse.position[1] - 500
-            scaled_input = abs(delta_y) * (sensitivity / 500)  # adjust denominator if needed
-            scaled_input = min(scaled_input, sensitivity)  # cap at max sensitivity
+            scaled_input = abs(delta_y) * current_sensitivity
 
-            output_magnitude = self.interpolate_curve(scaled_input, curve)
+            use_curve = hasattr(self, "curveWindow") and self.curveWindow.isVisible()
+            if use_curve:
+                output_magnitude = self.interpolate_curve(
+                    scaled_input, self.curveWindow.get_curve_mapping()
+                )
+            else:
+                output_magnitude = scaled_input
 
             if delta_y > 0:
                 mousey = -int(output_magnitude)
@@ -168,8 +170,7 @@ class MainWindow(QWidget):
             else:
                 mousey = 0
 
-            mousey_avg = max(-32768, min(32767, int((mousey + mousey2) / 2)))
-
+            mousey_avg = max(-32768, min(32767, (mousey + mousey2) // 2))
             mouse.position = (700, 500)
 
             print("Joystick y:", mousey_avg)
@@ -177,12 +178,14 @@ class MainWindow(QWidget):
             gamepad.left_joystick(x_value=0, y_value=mousey_avg)
             gamepad.update()
 
-            time.sleep(1 / pollRate)
+            elapsed = time.perf_counter() - cycle_start
+            sleep_time = max(0, (1 / pollRate) - elapsed)
+            time.sleep(sleep_time)
 
     def openCurveEditor(self):
-        self.curveWindow = CurveEditorWindow(sensitivity)
+        self.curveWindow = CurveEditorWindow()
         self.curveWindow.show()
-    
+
     def interpolate_curve(self, input_value, curve):
         """Linearly interpolate output from the curve based on input."""
         for i in range(len(curve) - 1):

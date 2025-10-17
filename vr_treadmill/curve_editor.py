@@ -4,12 +4,11 @@ from PyQt6.QtCore import Qt, QPointF, QRectF
 
 
 class CurveEditorWindow(QWidget):
-    def __init__(self, sensitivity=400, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Sensitivity Curve Editor")
         self.setMinimumSize(500, 500)
 
-        self.sensitivity = sensitivity
         self.margin = 40  # Padding around graph
         self.graph_width = 400
         self.graph_height = 400
@@ -58,8 +57,6 @@ class CurveEditorWindow(QWidget):
 
         # Draw labels for input/output ranges
         painter.setPen(QPen(Qt.GlobalColor.black))
-        painter.drawText(self.margin - 30, self.margin + self.graph_height, "0")
-        painter.drawText(self.margin - 30, self.margin, f"{self.sensitivity}")
         painter.drawText(
             self.margin, self.margin + self.graph_height + 20, "Mouse Input (Y)"
         )
@@ -91,15 +88,20 @@ class CurveEditorWindow(QWidget):
     def get_curve_mapping(self):
         """
         Returns list of (input, output) points
-        input: 0..sensitivity
-        output: 0..32767 (magnitude)
+        input: 0..32767 (based on X position of control points)
+        output: 0..32767 (based on Y position of control points, flipped so top = max)
         """
         mapping = []
         for p in self.points:
-            input_x = ((p.x() - self.margin) / self.graph_width) * self.sensitivity
-            # Flip Y so bottom = 0 magnitude, top = max magnitude
-            output_y = ((self.margin + self.graph_height) - p.y()) / self.graph_height * 32767
-            mapping.append((input_x, int(output_y)))
+            # X: from graph space (left to right) to 0..32767
+            input_x = ((p.x() - self.margin) / self.graph_width) * 32767
+
+            # Y: from graph space (bottom to top) to 0..32767
+            output_y = (
+                ((self.margin + self.graph_height) - p.y()) / self.graph_height * 32767
+            )
+
+            mapping.append((int(input_x), int(output_y)))
         return mapping
 
 
@@ -108,6 +110,6 @@ if __name__ == "__main__":
     from PyQt6.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
-    editor = CurveEditorWindow(sensitivity=400)
+    editor = CurveEditorWindow()
     editor.show()
     sys.exit(app.exec())
