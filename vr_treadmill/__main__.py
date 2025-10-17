@@ -14,7 +14,7 @@ import vgamepad as vg
 
 gamepad = vg.VX360Gamepad()
 mouse = Controller()
-enabled = True
+enabled = False
 keyToggle = False
 aKey = Key.alt_gr
 aKeyToggle = False  # Whether we're waiting for the user to press a key to bind
