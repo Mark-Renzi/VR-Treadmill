@@ -143,14 +143,10 @@ class MainWindow(QWidget):
         global enabled
         global keyToggle
         enabled = True
-        mousey1 = 0
-        mousey2 = 0
 
         while enabled and not keyToggle:
             cycle_start = time.perf_counter()
             current_sensitivity = sensitivity  # Read latest value
-            mousey2 = mousey1
-            mousey1 = 0
 
             delta_y = mouse.position[1] - 500
             scaled_input = abs(delta_y) * current_sensitivity
@@ -169,12 +165,12 @@ class MainWindow(QWidget):
             else:
                 mousey = 0
 
-            mousey_avg = max(-32768, min(32767, (mousey + mousey2) // 2))
+            clamped_mousey = max(-32768, min(32767, mousey))
             mouse.position = (700, 500)
 
-            print("Joystick y:", mousey_avg)
+            print("Joystick y:", clamped_mousey)
 
-            gamepad.left_joystick(x_value=0, y_value=mousey_avg)
+            gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
             gamepad.update()
 
             elapsed = time.perf_counter() - cycle_start
