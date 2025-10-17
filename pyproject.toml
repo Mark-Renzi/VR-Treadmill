@@ -1,0 +1,27 @@
+[project]
+name = "vr-treadmill"
+version = "0.1.0"
+description = "Script that converts mouse movement into joystick movement for a VR treadmill."
+readme = "README.md"
+requires-python = ">=3.13"
+
+dependencies = [
+    "pynput",
+    "vgamepad",
+    "PyQt6"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8"
+]
+
+[project.urls]
+Homepage = "https://pypi.org/project/vgamepad/"
+
+[tool.setuptools]
+packages = ["vr_treadmill"]
+
+[tool.setuptools.package-data]
+"vr_treadmill" = ["*.py"]
