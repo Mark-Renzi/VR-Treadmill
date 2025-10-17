@@ -13,8 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black",
-    "flake8"
+    "ruff"
 ]
 
 [project.urls]
