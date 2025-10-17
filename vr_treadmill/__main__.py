@@ -43,9 +43,9 @@ class JoystickWorker(QtCore.QThread):
         self.running = False
 
     def run(self):
-        global sensitivity, pollRate
+        global sensitivity, pollRate, window
 
-        while self.running:
+        while enabled and not keyToggle:
             cycle_start = time.perf_counter()
             current_sensitivity = sensitivity
             delta_y = mouse.position[1] - 500
@@ -54,11 +54,23 @@ class JoystickWorker(QtCore.QThread):
             # Emit signal to update the curve editor with current input
             self.update_input.emit(min(int(scaled_input), 32767))
 
+            use_curve = hasattr(window, "curveWindow") and window.curveWindow.isVisible()
+            show_dot = window.showDotCheckbox.isChecked()
+
+            if use_curve:
+                curve_lut = window.curveWindow.get_or_build_curve_mapping()
+                output_magnitude = window.interpolate_curve(scaled_input, curve_lut)
+
+                if show_dot:
+                    window.curveWindow.set_current_input(int(min(scaled_input, 32767)))
+            else:
+                output_magnitude = scaled_input
+
             # Use the curve editor to transform the input (in main thread)
             if delta_y > 0:
-                mousey = -int(scaled_input)
+                mousey = -int(output_magnitude)
             elif delta_y < 0:
-                mousey = int(scaled_input)
+                mousey = int(output_magnitude)
             else:
                 mousey = 0
 
