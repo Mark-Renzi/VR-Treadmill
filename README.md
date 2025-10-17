@@ -55,6 +55,9 @@ pip install -e .
 python -m vr_treadmill
 ```
 
+> [!WARNING]
+> In theory you could run this script without installing as a package but I don't plan to support this so if it doesn't work when you run the main file directly don't complain, just read the readme.
+
 ## FUTURE IDEAS
 
 using an openxr library to directly control the game instead of a virtual xbox360 controller
