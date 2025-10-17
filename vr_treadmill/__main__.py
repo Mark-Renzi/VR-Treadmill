@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QLabel,
 )
 import vgamepad as vg
+from vr_treadmill.curve_editor import CurveEditorWindow
 
 gamepad = vg.VX360Gamepad()
 mouse = Controller()
@@ -54,6 +55,9 @@ class MainWindow(QWidget):
         self.senseLine = QLineEdit(str(sensitivity))
         self.senseLine.textChanged.connect(self.setSensitivity)
 
+        self.openCurveEditorButton = QPushButton("Edit Sensitivity Curve")
+        self.openCurveEditorButton.clicked.connect(self.openCurveEditor)
+
         layout = QVBoxLayout()
         layout.addWidget(self.startJoy)
         layout.addWidget(senseLabel)
@@ -64,6 +68,7 @@ class MainWindow(QWidget):
         layout.addWidget(self.setKeyButton)
         layout.addWidget(self.aKeyLabel)
         layout.addWidget(self.setAKeyButton)
+        layout.addWidget(self.openCurveEditorButton)
 
         self.setLayout(layout)
         self.show()
@@ -138,30 +143,60 @@ class MainWindow(QWidget):
         global enabled
         global keyToggle
         enabled = True
-        mousey = 0
         mousey1 = 0
         mousey2 = 0
+
+        if hasattr(self, "curveWindow"):
+            curve = self.curveWindow.get_curve_mapping()
+        else:
+            curve = [(0, 0), (sensitivity, 32767)]
 
         while enabled and not keyToggle:
             mousey2 = mousey1
             mousey1 = 0
 
-            mousey1 = (mouse.position[1] - 500) * -(
-                sensitivity
-            )  # convert mouse position to joystick value
+            delta_y = mouse.position[1] - 500
+            scaled_input = abs(delta_y) * (sensitivity / 500)  # adjust denominator if needed
+            scaled_input = min(scaled_input, sensitivity)  # cap at max sensitivity
 
-            mousey = max(
-                -32768, min(32767, int((mousey1 + mousey2) / 2))
-            )  # average and clamp
-            mouse.position = (700, 500)  # reset mouse position
-            print("Joystick y:", mousey)
+            output_magnitude = self.interpolate_curve(scaled_input, curve)
 
-            gamepad.left_joystick(
-                x_value=0, y_value=mousey
-            )  # values between -32768 and 32767
+            if delta_y > 0:
+                mousey = -int(output_magnitude)
+            elif delta_y < 0:
+                mousey = int(output_magnitude)
+            else:
+                mousey = 0
+
+            mousey_avg = max(-32768, min(32767, int((mousey + mousey2) / 2)))
+
+            mouse.position = (700, 500)
+
+            print("Joystick y:", mousey_avg)
+
+            gamepad.left_joystick(x_value=0, y_value=mousey_avg)
             gamepad.update()
 
             time.sleep(1 / pollRate)
+
+    def openCurveEditor(self):
+        self.curveWindow = CurveEditorWindow(sensitivity)
+        self.curveWindow.show()
+    
+    def interpolate_curve(self, input_value, curve):
+        """Linearly interpolate output from the curve based on input."""
+        for i in range(len(curve) - 1):
+            x1, y1 = curve[i]
+            x2, y2 = curve[i + 1]
+            if x1 <= input_value <= x2:
+                # Linear interpolation
+                ratio = (input_value - x1) / (x2 - x1)
+                return y1 + ratio * (y2 - y1)
+        # If input is out of bounds, clamp to end values
+        if input_value < curve[0][0]:
+            return curve[0][1]
+        else:
+            return curve[-1][1]
 
 
 def onPress(key):
