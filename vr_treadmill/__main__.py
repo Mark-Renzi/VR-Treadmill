@@ -1,3 +1,5 @@
+import signal
+import sys
 import time
 from pynput.keyboard import Key, Listener
 from pynput.mouse import Controller
@@ -311,10 +313,40 @@ def onRelease(key):
         gamepad.update()
 
 
+def cleanup():
+    global window, listener
+    print("Cleaning up...")
+
+    if hasattr(window, "worker") and window.worker.isRunning():
+        window.worker.stop_loop()
+        window.worker.wait()
+
+    if listener.running:
+        listener.stop()
+
+    if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
+        window.curveWindow.clear_current_input()
+
+    print("Exited cleanly.")
+    app.quit()
+    sys.exit(0)
+
+
+# Handle SIGINT (Ctrl+C) properly
+signal.signal(signal.SIGINT, lambda sig, frame: cleanup())
+
+
 listener = Listener(on_press=onPress, on_release=onRelease)
 listener.start()
 
-app = QApplication([])
-window = MainWindow()
-window.show()
-app.exec()
+try:
+    app = QApplication([])
+    window = MainWindow()
+    window.show()
+    timer = QtCore.QTimer()
+    timer.timeout.connect(lambda: None)
+    timer.start(100)
+
+    app.exec()
+except KeyboardInterrupt:
+    cleanup()
