@@ -12,10 +12,14 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QLabel,
     QCheckBox,
+    QRadioButton,
+    QGroupBox,
+    QHBoxLayout,
 )
 import vgamepad as vg
 from vr_treadmill.curve_editor import CurveEditorWindow
-from vr_treadmill.raw_mouse_listener import RawMouseListener 
+from vr_treadmill.raw_mouse_listener import RawMouseListener
+import statistics
 
 gamepad = vg.VX360Gamepad()
 mouse = Controller()
@@ -40,6 +44,11 @@ quitKey = Key.ctrl_r  # Which key will stop the program
 averageCount = 5  # Number of data points in the smoothing window.
 # -------------------------------------------------------------------
 
+SMOOTHING_TYPE_MEAN = 0
+SMOOTHING_TYPE_MEDIAN = 1
+SMOOTHING_TYPE_MAX = 2
+smoothingType = SMOOTHING_TYPE_MEAN
+
 
 class JoystickWorker(QtCore.QThread):
     update_input = QtCore.pyqtSignal(int)
@@ -58,7 +67,7 @@ class JoystickWorker(QtCore.QThread):
         self.mouseDeltaHistory = []
 
     def run(self):
-        global sensitivity, pollRate, window, recenterEnabled, useRawInput, mouseDeltaY, averageCount
+        global sensitivity, pollRate, window, recenterEnabled, useRawInput, mouseDeltaY, averageCount, smoothingType
 
         while enabled and not keyToggle:
             cycle_start = time.perf_counter()
@@ -80,7 +89,14 @@ class JoystickWorker(QtCore.QThread):
                 self.mouseDeltaHistory = self.mouseDeltaHistory[-averageCount:]
 
             if self.mouseDeltaHistory:
-                delta_y = sum(self.mouseDeltaHistory) / len(self.mouseDeltaHistory)
+                if smoothingType == SMOOTHING_TYPE_MEAN:
+                    delta_y = statistics.mean(self.mouseDeltaHistory)
+                elif smoothingType == SMOOTHING_TYPE_MEDIAN:
+                    delta_y = statistics.median(self.mouseDeltaHistory)
+                elif smoothingType == SMOOTHING_TYPE_MAX:
+                    delta_y = max(self.mouseDeltaHistory, key=abs)
+                else:
+                    delta_y = statistics.mean(self.mouseDeltaHistory)
             else:
                 delta_y = 0
             
@@ -150,7 +166,7 @@ class MainWindow(QWidget):
 
         pollLabel = QLabel("Polling Rate (/sec):")
         senseLabel = QLabel("Sensitivity:")
-        avgLabel = QLabel("Data Points to Average (1 = Off):")
+        avgLabel = QLabel("Data Points in Smoothing Window (1 = Off):")
         self.keyLabel = QLabel(f"Stop Key: {quitKey}")
 
         self.pollRateLine = QLineEdit(str(pollRate))
@@ -173,6 +189,27 @@ class MainWindow(QWidget):
 
         self.setRecenterKeyButton.setEnabled(not useRawInput)
 
+        self.smoothingGroup = QGroupBox("Smoothing Type")
+        self.meanRadio = QRadioButton("Mean")
+        self.medianRadio = QRadioButton("Median")
+        self.maxRadio = QRadioButton("Peak")
+
+        if smoothingType == SMOOTHING_TYPE_MEAN:
+            self.meanRadio.setChecked(True)
+        elif smoothingType == SMOOTHING_TYPE_MEDIAN:
+            self.medianRadio.setChecked(True)
+        elif smoothingType == SMOOTHING_TYPE_MAX:
+            self.maxRadio.setChecked(True)
+
+        self.meanRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MEAN))
+        self.medianRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MEDIAN))
+        self.maxRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MAX))
+
+        h_layout = QHBoxLayout()
+        h_layout.addWidget(self.meanRadio)
+        h_layout.addWidget(self.medianRadio)
+        h_layout.addWidget(self.maxRadio)
+        self.smoothingGroup.setLayout(h_layout)
 
         layout = QVBoxLayout()
         layout.addWidget(self.startStopButton)
@@ -182,6 +219,7 @@ class MainWindow(QWidget):
         layout.addWidget(self.pollRateLine)
         layout.addWidget(avgLabel)
         layout.addWidget(self.avgLine)
+        layout.addWidget(self.smoothingGroup)
         layout.addWidget(self.keyLabel)
         layout.addWidget(self.setKeyButton)
         layout.addWidget(self.aKeyLabel)
@@ -278,6 +316,19 @@ class MainWindow(QWidget):
             self.validAverageCount = False
             print("Invalid averaging count (must be a positive integer)")
         self.updateStartButton()
+        
+    def setSmoothingType(self, type_id):
+        """Sets the global smoothing type based on the radio button selection."""
+        global smoothingType
+        if type_id == SMOOTHING_TYPE_MEAN and self.meanRadio.isChecked():
+            smoothingType = SMOOTHING_TYPE_MEAN
+            print("Smoothing type set to: Mean")
+        elif type_id == SMOOTHING_TYPE_MEDIAN and self.medianRadio.isChecked():
+            smoothingType = SMOOTHING_TYPE_MEDIAN
+            print("Smoothing type set to: Median")
+        elif type_id == SMOOTHING_TYPE_MAX and self.maxRadio.isChecked():
+            smoothingType = SMOOTHING_TYPE_MAX
+            print("Smoothing type set to: Max (Absolute)")
 
     def setAKey(self):
         global aKey
