@@ -4,8 +4,10 @@ Script that converts mouse movement into joystick movement for a VR treadmill.
 This version adds some more features, including:
 - Raw mouse input to avoid locking the mouse or hitting the edge of the screen
 - Sensitivity remapping and visualization
+- Config saving and loading
 
-<img width="480" height="434" alt="image" src="https://github.com/user-attachments/assets/0943172c-6350-423d-9f11-d5af8895bde8" />
+<img width="1422" height="951" alt="image" src="https://github.com/user-attachments/assets/aade5196-4e8f-45ff-b5c9-94a335f1e1d9" />
+
 
 
 ## Install Process
