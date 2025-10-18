@@ -1,3 +1,5 @@
+import os
+import json
 import signal
 import sys
 import time
@@ -15,6 +17,8 @@ from PyQt6.QtWidgets import (
     QRadioButton,
     QGroupBox,
     QHBoxLayout,
+    QComboBox,
+    QInputDialog,
 )
 import vgamepad as vg
 from vr_treadmill.curve_editor import CurveEditorWindow
@@ -48,6 +52,9 @@ SMOOTHING_TYPE_MEAN = 0
 SMOOTHING_TYPE_MEDIAN = 1
 SMOOTHING_TYPE_MAX = 2
 smoothingType = SMOOTHING_TYPE_MEAN
+
+CONFIG_DIR = "./configs"
+os.makedirs(CONFIG_DIR, exist_ok=True)
 
 
 class JoystickWorker(QtCore.QThread):
@@ -211,6 +218,15 @@ class MainWindow(QWidget):
         h_layout.addWidget(self.maxRadio)
         self.smoothingGroup.setLayout(h_layout)
 
+        self.configDropdown = QComboBox()
+        self.loadConfigButton = QPushButton("Load Config")
+        self.saveConfigButton = QPushButton("Save Config")
+
+        self.loadConfigButton.clicked.connect(self.load_config)
+        self.saveConfigButton.clicked.connect(self.save_config)
+
+        self.update_config_dropdown()
+
         layout = QVBoxLayout()
         layout.addWidget(self.startStopButton)
         layout.addWidget(senseLabel)
@@ -229,6 +245,10 @@ class MainWindow(QWidget):
         layout.addWidget(self.rawInputCheckbox)
         layout.addWidget(self.openCurveEditorButton)
         layout.addWidget(self.showDotCheckbox)
+        layout.addWidget(QLabel("Config:"))
+        layout.addWidget(self.configDropdown)
+        layout.addWidget(self.loadConfigButton)
+        layout.addWidget(self.saveConfigButton)
 
         self.setLayout(layout)
         self.show()
@@ -420,6 +440,62 @@ class MainWindow(QWidget):
             self.setRecenterKeyButton.setText("Set Recenter Toggle Key")
             print("Recenter toggle key confirmed.")
             recenterKeyToggle = False
+
+    def get_current_config(self):
+        return {
+            "sensitivity": self.senseLine.text(),
+            "poll_rate": self.pollRateLine.text(),
+            "average_count": self.avgLine.text(),
+            "smoothing_type": smoothingType,
+            "raw_input": useRawInput
+        }
+
+    def apply_config(self, config):
+        self.senseLine.setText(str(config.get("sensitivity", "100")))
+        self.pollRateLine.setText(str(config.get("poll_rate", "60")))
+        self.avgLine.setText(str(config.get("average_count", "5")))
+
+        smoothing = config.get("smoothing_type", SMOOTHING_TYPE_MEAN)
+        if smoothing == SMOOTHING_TYPE_MEAN:
+            self.meanRadio.setChecked(True)
+        elif smoothing == SMOOTHING_TYPE_MEDIAN:
+            self.medianRadio.setChecked(True)
+        elif smoothing == SMOOTHING_TYPE_MAX:
+            self.maxRadio.setChecked(True)
+
+        self.rawInputCheckbox.setChecked(config.get("raw_input", True))
+
+    def save_config(self):
+        name, ok = QInputDialog.getText(self, "Save Config", "Enter config name:")
+        if ok and name:
+            config = self.get_current_config()
+            path = os.path.join(CONFIG_DIR, f"{name}.json")
+            try:
+                with open(path, "w") as f:
+                    json.dump(config, f, indent=4)
+                print(f"Config '{name}' saved.")
+                self.update_config_dropdown()
+            except Exception as e:
+                print(f"Failed to save config: {e}")
+
+    def load_config(self):
+        name = self.configDropdown.currentText()
+        if not name:
+            return
+        path = os.path.join(CONFIG_DIR, f"{name}.json")
+        try:
+            with open(path, "r") as f:
+                config = json.load(f)
+                self.apply_config(config)
+                print(f"Config '{name}' loaded.")
+        except Exception as e:
+            print(f"Failed to load config '{name}': {e}")
+
+    def update_config_dropdown(self):
+        self.configDropdown.clear()
+        configs = [f[:-5] for f in os.listdir(CONFIG_DIR) if f.endswith(".json")]
+        self.configDropdown.addItems(sorted(configs))
+
 
 
 def onPress(key):
