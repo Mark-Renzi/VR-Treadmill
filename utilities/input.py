@@ -18,11 +18,12 @@ RIDEV_INPUTSINK = 0x00000100
 MOUSE_MOVE_RELATIVE = 0
 MOUSE_MOVE_ABSOLUTE = 1
 
+
 # ---------------------------
 # Raw input structures
 # ---------------------------
 class RAWINPUTDEVICE(ctypes.Structure):
-#    _pack_ = 1
+    #    _pack_ = 1
     _fields_ = [
         ("usUsagePage", wintypes.USHORT),
         ("usUsage", wintypes.USHORT),
@@ -30,8 +31,9 @@ class RAWINPUTDEVICE(ctypes.Structure):
         ("hwndTarget", wintypes.HWND),
     ]
 
+
 class RAWINPUTHEADER(ctypes.Structure):
-#    _pack_ = 1
+    #    _pack_ = 1
     _fields_ = [
         ("dwType", wintypes.DWORD),
         ("dwSize", wintypes.DWORD),
@@ -39,24 +41,27 @@ class RAWINPUTHEADER(ctypes.Structure):
         ("wParam", wintypes.WPARAM),
     ]
 
+
 # Inner struct for button flags (union member)
 class _BUTTONS_STRUCT(ctypes.Structure):
-#    _pack_ = 1
+    #    _pack_ = 1
     _fields_ = [
         ("usButtonFlags", wintypes.USHORT),
         ("usButtonData", wintypes.USHORT),
     ]
 
+
 # Union of ulButtons and buttonStruct
 class _BUTTONS_UNION(ctypes.Union):
-#    _pack_ = 1
+    #    _pack_ = 1
     _fields_ = [
         ("ulButtons", wintypes.ULONG),
         ("buttonsStruct", _BUTTONS_STRUCT),
     ]
 
+
 class RAWMOUSE(ctypes.Structure):
-#    _pack_ = 1
+    #    _pack_ = 1
     _anonymous_ = ("buttons",)
     _fields_ = [
         ("usFlags", wintypes.USHORT),
@@ -67,8 +72,9 @@ class RAWMOUSE(ctypes.Structure):
         ("ulExtraInformation", wintypes.ULONG),
     ]
 
+
 class RAWKEYBOARD(ctypes.Structure):
-#    _pack_ = 1
+    #    _pack_ = 1
     _fields_ = [
         ("MakeCode", wintypes.USHORT),
         ("Flags", wintypes.USHORT),
@@ -78,33 +84,40 @@ class RAWKEYBOARD(ctypes.Structure):
         ("ExtraInformation", wintypes.ULONG),
     ]
 
+
 class RAWHID(ctypes.Structure):
-#    _pack_ = 1
+    #    _pack_ = 1
     _fields_ = [
         ("dwSizeHid", wintypes.DWORD),
         ("dwCount", wintypes.DWORD),
         ("bRawData", ctypes.c_ubyte * 1),
     ]
 
+
 class RAWINPUTUNION(ctypes.Union):
-#    _pack_ = 1
+    #    _pack_ = 1
     _fields_ = [
         ("mouse", RAWMOUSE),
         ("keyboard", RAWKEYBOARD),
         ("hid", RAWHID),
     ]
 
+
 class RAWINPUT(ctypes.Structure):
-#    _pack_ = 1
+    #    _pack_ = 1
     _fields_ = [
         ("header", RAWINPUTHEADER),
         ("data", RAWINPUTUNION),
     ]
 
+
 # ---------------------------
 # WNDCLASS definition
 # ---------------------------
-WNDPROCTYPE = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+WNDPROCTYPE = ctypes.WINFUNCTYPE(
+    ctypes.c_long, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
+)
+
 
 class WNDCLASS(ctypes.Structure):
     _fields_ = [
@@ -120,34 +133,42 @@ class WNDCLASS(ctypes.Structure):
         ("lpszClassName", wintypes.LPCWSTR),
     ]
 
+
 # Store a global reference to avoid garbage collection
 wnd_proc_ref = None
+
 
 # ---------------------------
 # Raw input handling
 # ---------------------------
 def handle_raw_input(lParam):
     data_size = wintypes.UINT()
-    if user32.GetRawInputData(
-        lParam,
-        RID_INPUT,
-        None,
-        ctypes.byref(data_size),
-        ctypes.sizeof(RAWINPUTHEADER)
-    ) != 0:
+    if (
+        user32.GetRawInputData(
+            lParam,
+            RID_INPUT,
+            None,
+            ctypes.byref(data_size),
+            ctypes.sizeof(RAWINPUTHEADER),
+        )
+        != 0
+    ):
         raise ctypes.WinError()
     else:
         buffer = ctypes.create_string_buffer(data_size.value)
 
-    if user32.GetRawInputData(
-        lParam,
-        RID_INPUT,
-        buffer,
-        ctypes.byref(data_size),
-        ctypes.sizeof(RAWINPUTHEADER),
-    ) != data_size.value:
+    if (
+        user32.GetRawInputData(
+            lParam,
+            RID_INPUT,
+            buffer,
+            ctypes.byref(data_size),
+            ctypes.sizeof(RAWINPUTHEADER),
+        )
+        != data_size.value
+    ):
         raise ctypes.WinError()
-    
+
     # print("Expected struct size:", ctypes.sizeof(RAWINPUT))
     # print("Buffer size returned:", data_size.value)
 
@@ -158,6 +179,7 @@ def handle_raw_input(lParam):
         dy = raw.data.mouse.lLastY
 
         print(f"Flags: {flags}, dx: {dx}, dy: {dy}")
+
 
 # ---------------------------
 # Create message window
@@ -176,9 +198,8 @@ def create_message_window():
             wintypes.HWND(hwnd),
             wintypes.UINT(msg),
             wintypes.WPARAM(wParam),
-            wintypes.LPARAM(lParam)
+            wintypes.LPARAM(lParam),
         )
-
 
     wnd_proc_ref = wnd_proc  # prevent GC
 
@@ -202,14 +223,21 @@ def create_message_window():
         className,
         "Hidden Raw Input Window",
         0,
-        0, 0, 0, 0,
-        None, None, hInstance, None,
+        0,
+        0,
+        0,
+        0,
+        None,
+        None,
+        hInstance,
+        None,
     )
 
     if not hwnd:
         raise ctypes.WinError()
 
     return hwnd
+
 
 def register_raw_input(hwnd):
     rid = RAWINPUTDEVICE()
@@ -220,6 +248,7 @@ def register_raw_input(hwnd):
 
     if not user32.RegisterRawInputDevices(ctypes.byref(rid), 1, ctypes.sizeof(rid)):
         raise ctypes.WinError()
+
 
 def message_loop():
     msg = wintypes.MSG()
@@ -232,6 +261,7 @@ def message_loop():
         else:
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
+
 
 # ---------------------------
 # Run

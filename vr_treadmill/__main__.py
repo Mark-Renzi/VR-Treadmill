@@ -74,24 +74,32 @@ class JoystickWorker(QtCore.QThread):
         self.mouseDeltaHistory = []
 
     def run(self):
-        global sensitivity, pollRate, window, recenterEnabled, useRawInput, mouseDeltaY, averageCount, smoothingType
+        global \
+            sensitivity, \
+            pollRate, \
+            window, \
+            recenterEnabled, \
+            useRawInput, \
+            mouseDeltaY, \
+            averageCount, \
+            smoothingType
 
         while enabled and not keyToggle:
             cycle_start = time.perf_counter()
             current_sensitivity = sensitivity
-            
+
             if useRawInput:
                 # Use the accumulated delta from the raw input listener
                 delta_y_current = mouseDeltaY
-                mouseDeltaY = 0 # Reset the delta for the next cycle
+                mouseDeltaY = 0  # Reset the delta for the next cycle
             else:
                 # Traditional polling and recentering logic
                 delta_y_current = mouse.position[1] - 500
                 if recenterEnabled:
                     mouse.position = (700, 500)
-            
+
             self.mouseDeltaHistory.append(delta_y_current)
-            
+
             if len(self.mouseDeltaHistory) > averageCount:
                 self.mouseDeltaHistory = self.mouseDeltaHistory[-averageCount:]
 
@@ -106,7 +114,7 @@ class JoystickWorker(QtCore.QThread):
                     delta_y = statistics.mean(self.mouseDeltaHistory)
             else:
                 delta_y = 0
-            
+
             scaled_input = abs(delta_y) * current_sensitivity
 
             use_curve = (
@@ -119,7 +127,9 @@ class JoystickWorker(QtCore.QThread):
 
                 show_dot = window.showDotCheckbox.isChecked()
                 if show_dot:
-                    self.update_input.emit(min(int(abs(delta_y) * current_sensitivity), 32767))
+                    self.update_input.emit(
+                        min(int(abs(delta_y) * current_sensitivity), 32767)
+                    )
             else:
                 output_magnitude = scaled_input
 
@@ -131,14 +141,14 @@ class JoystickWorker(QtCore.QThread):
                 mousey = 0
 
             clamped_mousey = max(-32768, min(32767, mousey))
-            
+
             print("Joystick y:", clamped_mousey)
 
             gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
             gamepad.update()
 
             elapsed = time.perf_counter() - cycle_start
-            
+
             sleep_time = max(0, (1 / pollRate) - elapsed)
             time.sleep(sleep_time)
 
@@ -149,7 +159,7 @@ class MainWindow(QWidget):
 
         self.worker = JoystickWorker()
         self.worker.update_input.connect(self.update_curve_input)
-        
+
         self.raw_listener = RawMouseListener()
         self.raw_listener.delta_signal.connect(self.update_mouse_delta)
 
@@ -181,7 +191,7 @@ class MainWindow(QWidget):
 
         self.senseLine = QLineEdit(str(sensitivity))
         self.senseLine.textChanged.connect(self.setSensitivity)
-        
+
         self.avgLine = QLineEdit(str(averageCount))
         self.avgLine.textChanged.connect(self.setAverageCount)
 
@@ -189,7 +199,7 @@ class MainWindow(QWidget):
         self.openCurveEditorButton.clicked.connect(self.openCurveEditor)
 
         self.showDotCheckbox = QCheckBox("Show Input on Curve")
-        
+
         self.rawInputCheckbox = QCheckBox("Use Raw Input (Windows)")
         self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
         self.rawInputCheckbox.setChecked(useRawInput)
@@ -208,8 +218,12 @@ class MainWindow(QWidget):
         elif smoothingType == SMOOTHING_TYPE_MAX:
             self.maxRadio.setChecked(True)
 
-        self.meanRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MEAN))
-        self.medianRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MEDIAN))
+        self.meanRadio.toggled.connect(
+            lambda: self.setSmoothingType(SMOOTHING_TYPE_MEAN)
+        )
+        self.medianRadio.toggled.connect(
+            lambda: self.setSmoothingType(SMOOTHING_TYPE_MEDIAN)
+        )
         self.maxRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MAX))
 
         h_layout = QHBoxLayout()
@@ -260,8 +274,8 @@ class MainWindow(QWidget):
 
     def toggleRawInput(self, state):
         global useRawInput, recenterEnabled
-        useRawInput = (state == 2)
-        
+        useRawInput = state == 2
+
         # Disable recentering when raw input is on
         if useRawInput:
             recenterEnabled = False
@@ -278,7 +292,6 @@ class MainWindow(QWidget):
         """Accumulate mouse deltas from the RawMouseListener thread."""
         global mouseDeltaY
         mouseDeltaY += dy
-
 
     def update_curve_input(self, input_value: int):
         if (
@@ -336,7 +349,7 @@ class MainWindow(QWidget):
             self.validAverageCount = False
             print("Invalid averaging count (must be a positive integer)")
         self.updateStartButton()
-        
+
     def setSmoothingType(self, type_id):
         """Sets the global smoothing type based on the radio button selection."""
         global smoothingType
@@ -392,7 +405,7 @@ class MainWindow(QWidget):
         if enabled:
             enabled = False
             self.worker.stop_loop()
-            
+
             mouseDeltaY = 0
 
             print("Tracking stopped via GUI button.")
@@ -400,14 +413,14 @@ class MainWindow(QWidget):
             enabled = True
             if useRawInput and not self.raw_listener.isRunning():
                 self.raw_listener.start()
-            
+
             if not self.worker.isRunning():
                 self.save_config(name="latest_config")
                 self.worker.start_loop()
                 print("Tracking started.")
             else:
                 print("Worker is already running or being started.")
-            
+
         self.updateStartStopButtonText()
 
     def openCurveEditor(self):
@@ -453,9 +466,12 @@ class MainWindow(QWidget):
             "a_key": str(aKey),
             "recenter_key": str(recenterToggleKey),
             "recenter_enabled": recenterEnabled,
-            "curve_editor_open": hasattr(self, "curveWindow") and self.curveWindow.isVisible(),
+            "curve_editor_open": hasattr(self, "curveWindow")
+            and self.curveWindow.isVisible(),
             "show_input_on_curve": self.showDotCheckbox.isChecked(),
-            "curve_points": self.curveWindow.serialize_points() if hasattr(self, "curveWindow") else None,
+            "curve_points": self.curveWindow.serialize_points()
+            if hasattr(self, "curveWindow")
+            else None,
         }
 
     def apply_config(self, config):
@@ -478,7 +494,9 @@ class MainWindow(QWidget):
         # Restore key binds
         quitKey = self._key_from_string(config.get("stop_key", str(Key.ctrl_r)))
         aKey = self._key_from_string(config.get("a_key", str(Key.alt_gr)))
-        recenterToggleKey = self._key_from_string(config.get("recenter_key", str(Key.f9)))
+        recenterToggleKey = self._key_from_string(
+            config.get("recenter_key", str(Key.f9))
+        )
         recenterEnabled = config.get("recenter_enabled", False)
 
         self.keyLabel.setText(f"Stop Key: {quitKey}")
@@ -494,7 +512,7 @@ class MainWindow(QWidget):
                 self.curveWindow.deserialize_points(points_data)
 
         self.showDotCheckbox.setChecked(config.get("show_input_on_curve", False))
-    
+
     def _key_from_string(self, key_str):
         try:
             if key_str.startswith("Key."):
@@ -542,7 +560,6 @@ class MainWindow(QWidget):
         self.configDropdown.addItems(sorted(configs))
 
 
-
 def onPress(key):
     global \
         enabled, \
@@ -553,7 +570,7 @@ def onPress(key):
         recenterToggleKey, \
         recenterEnabled, \
         useRawInput
-        
+
     if keyToggle:
         print("Stop key will be", str(key))
         quitKey = key
@@ -565,13 +582,13 @@ def onPress(key):
             global mouseDeltaY
             enabled = False
             window.worker.stop_loop()
-            
+
             mouseDeltaY = 0
 
             if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
                 window.curveWindow.clear_current_input()
-            
-            window.updateStartStopButtonText() 
+
+            window.updateStartStopButtonText()
 
             print("Stopped with", quitKey)
         elif key == aKey:
@@ -604,7 +621,7 @@ def cleanup():
     if hasattr(window, "worker") and window.worker.isRunning():
         window.worker.stop_loop()
         window.worker.wait()
-    
+
     if hasattr(window, "raw_listener") and window.raw_listener.isRunning():
         window.raw_listener.stop()
         window.raw_listener.wait()

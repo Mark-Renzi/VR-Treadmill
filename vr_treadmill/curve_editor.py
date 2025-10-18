@@ -87,9 +87,7 @@ class CurveEditorWindow(QWidget):
             if y is not None:
                 painter.setBrush(QColor("green"))
                 painter.setPen(QPen(Qt.GlobalColor.black))
-                painter.drawEllipse(
-                    QPointF(x, y), self.point_radius, self.point_radius
-                )
+                painter.drawEllipse(QPointF(x, y), self.point_radius, self.point_radius)
 
     def clear_current_input(self):
         self.current_input = None

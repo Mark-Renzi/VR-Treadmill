@@ -19,6 +19,7 @@ HCURSOR = wintypes.HANDLE
 HICON = wintypes.HANDLE
 HBRUSH = wintypes.HANDLE
 
+
 # ---------------------------
 # Raw input structures (same as provided snippet)
 # ---------------------------
@@ -30,6 +31,7 @@ class RAWINPUTDEVICE(ctypes.Structure):
         ("hwndTarget", wintypes.HWND),
     ]
 
+
 class RAWINPUTHEADER(ctypes.Structure):
     _fields_ = [
         ("dwType", wintypes.DWORD),
@@ -38,17 +40,20 @@ class RAWINPUTHEADER(ctypes.Structure):
         ("wParam", wintypes.WPARAM),
     ]
 
+
 class _BUTTONS_STRUCT(ctypes.Structure):
     _fields_ = [
         ("usButtonFlags", wintypes.USHORT),
         ("usButtonData", wintypes.USHORT),
     ]
 
+
 class _BUTTONS_UNION(ctypes.Union):
     _fields_ = [
         ("ulButtons", wintypes.ULONG),
         ("buttonsStruct", _BUTTONS_STRUCT),
     ]
+
 
 class RAWMOUSE(ctypes.Structure):
     _anonymous_ = ("buttons",)
@@ -61,6 +66,7 @@ class RAWMOUSE(ctypes.Structure):
         ("ulExtraInformation", wintypes.ULONG),
     ]
 
+
 class RAWKEYBOARD(ctypes.Structure):
     _fields_ = [
         ("MakeCode", wintypes.USHORT),
@@ -71,12 +77,14 @@ class RAWKEYBOARD(ctypes.Structure):
         ("ExtraInformation", wintypes.ULONG),
     ]
 
+
 class RAWHID(ctypes.Structure):
     _fields_ = [
         ("dwSizeHid", wintypes.DWORD),
         ("dwCount", wintypes.DWORD),
         ("bRawData", ctypes.c_ubyte * 1),
     ]
+
 
 class RAWINPUTUNION(ctypes.Union):
     _fields_ = [
@@ -85,16 +93,21 @@ class RAWINPUTUNION(ctypes.Union):
         ("hid", RAWHID),
     ]
 
+
 class RAWINPUT(ctypes.Structure):
     _fields_ = [
         ("header", RAWINPUTHEADER),
         ("data", RAWINPUTUNION),
     ]
 
+
 # ---------------------------
 # WNDCLASS definition
 # ---------------------------
-WNDPROCTYPE = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+WNDPROCTYPE = ctypes.WINFUNCTYPE(
+    ctypes.c_long, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
+)
+
 
 class WNDCLASS(ctypes.Structure):
     _fields_ = [
@@ -110,6 +123,7 @@ class WNDCLASS(ctypes.Structure):
         ("lpszClassName", wintypes.LPCWSTR),
     ]
 
+
 # ---------------------------
 # RawMouseListener Class
 # ---------------------------
@@ -121,7 +135,7 @@ class RawMouseListener(QtCore.QThread):
         super().__init__(parent)
         self.running = False
         self.hwnd = None
-        self.wnd_proc_ref = None # Prevent GC of callback
+        self.wnd_proc_ref = None  # Prevent GC of callback
 
     def create_message_window(self):
         hInstance = kernel32.GetModuleHandleW(None)
@@ -137,7 +151,7 @@ class RawMouseListener(QtCore.QThread):
                 wintypes.HWND(hwnd),
                 wintypes.UINT(msg),
                 wintypes.WPARAM(wParam),
-                wintypes.LPARAM(lParam)
+                wintypes.LPARAM(lParam),
             )
 
         self.wnd_proc_ref = wnd_proc
@@ -146,14 +160,23 @@ class RawMouseListener(QtCore.QThread):
         wc.lpfnWndProc = self.wnd_proc_ref
         wc.lpszClassName = className
         wc.hInstance = hInstance
-        
+
         if not user32.RegisterClassW(ctypes.byref(wc)):
             raise ctypes.WinError()
 
         self.hwnd = user32.CreateWindowExW(
-            0, className, "Hidden Raw Input Window", 0,
-            0, 0, 0, 0,
-            None, None, hInstance, None,
+            0,
+            className,
+            "Hidden Raw Input Window",
+            0,
+            0,
+            0,
+            0,
+            0,
+            None,
+            None,
+            hInstance,
+            None,
         )
 
         if not self.hwnd:
@@ -161,9 +184,9 @@ class RawMouseListener(QtCore.QThread):
 
     def register_raw_input(self):
         rid = RAWINPUTDEVICE()
-        rid.usUsagePage = 0x01 # Generic Desktop Controls
-        rid.usUsage = 0x02     # Mouse
-        rid.dwFlags = RIDEV_INPUTSINK # Listen even if not foreground
+        rid.usUsagePage = 0x01  # Generic Desktop Controls
+        rid.usUsage = 0x02  # Mouse
+        rid.dwFlags = RIDEV_INPUTSINK  # Listen even if not foreground
         rid.hwndTarget = self.hwnd
 
         if not user32.RegisterRawInputDevices(ctypes.byref(rid), 1, ctypes.sizeof(rid)):
@@ -171,13 +194,31 @@ class RawMouseListener(QtCore.QThread):
 
     def handle_raw_input(self, lParam):
         data_size = wintypes.UINT()
-        
-        if user32.GetRawInputData(lParam, RID_INPUT, None, ctypes.byref(data_size), ctypes.sizeof(RAWINPUTHEADER)) != 0:
-            return # Error or nothing to read
+
+        if (
+            user32.GetRawInputData(
+                lParam,
+                RID_INPUT,
+                None,
+                ctypes.byref(data_size),
+                ctypes.sizeof(RAWINPUTHEADER),
+            )
+            != 0
+        ):
+            return  # Error or nothing to read
 
         buffer = ctypes.create_string_buffer(data_size.value)
 
-        if user32.GetRawInputData(lParam, RID_INPUT, buffer, ctypes.byref(data_size), ctypes.sizeof(RAWINPUTHEADER)) == data_size.value:
+        if (
+            user32.GetRawInputData(
+                lParam,
+                RID_INPUT,
+                buffer,
+                ctypes.byref(data_size),
+                ctypes.sizeof(RAWINPUTHEADER),
+            )
+            == data_size.value
+        ):
             raw = RAWINPUT.from_buffer_copy(buffer.raw)
             if raw.header.dwType == RIM_TYPEMOUSE:
                 dx = raw.data.mouse.lLastX
@@ -190,10 +231,12 @@ class RawMouseListener(QtCore.QThread):
             self.register_raw_input()
             self.running = True
             print("Raw Mouse Listener started.")
-            
+
             # Message loop - runs until PostQuitMessage or stop() is called.
             msg = wintypes.MSG()
-            while self.running and user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+            while (
+                self.running and user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0
+            ):
                 user32.TranslateMessage(ctypes.byref(msg))
                 user32.DispatchMessageW(ctypes.byref(msg))
 
@@ -209,7 +252,7 @@ class RawMouseListener(QtCore.QThread):
         if self.hwnd:
             # Post a quit message to break the message loop in the thread
             user32.PostQuitMessage(0)
-            
+
     def cleanup_window(self):
         if self.hwnd:
             user32.DestroyWindow(self.hwnd)
