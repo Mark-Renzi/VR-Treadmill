@@ -335,7 +335,6 @@ def onPress(key):
         if key == quitKey:
             enabled = False
             window.worker.stop_loop()
-            window.raw_listener.stop()
             if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
                 window.curveWindow.clear_current_input()
 
