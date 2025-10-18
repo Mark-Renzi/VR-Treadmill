@@ -123,8 +123,8 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("Maratron")
 
-        self.startJoy = QPushButton("Start")
-        self.startJoy.clicked.connect(self.run)
+        self.startStopButton = QPushButton("Start")
+        self.startStopButton.clicked.connect(self.toggleTracking)
 
         self.setKeyButton = QPushButton("Set Stop Key")
         self.setKeyButton.clicked.connect(self.setKey)
@@ -160,7 +160,7 @@ class MainWindow(QWidget):
 
 
         layout = QVBoxLayout()
-        layout.addWidget(self.startJoy)
+        layout.addWidget(self.startStopButton)
         layout.addWidget(senseLabel)
         layout.addWidget(self.senseLine)
         layout.addWidget(pollLabel)
@@ -213,7 +213,7 @@ class MainWindow(QWidget):
             self.curveWindow.set_current_input(input_value)
 
     def updateStartButton(self):
-        self.startJoy.setEnabled(self.validSensitivity and self.validPollRate)
+        self.startStopButton.setEnabled(self.validSensitivity and self.validPollRate)
 
     def setPollingRate(self, value):
         global pollRate
@@ -274,12 +274,33 @@ class MainWindow(QWidget):
             print("Confirmed")
             keyToggle = False
 
-    def run(self):
-        global enabled, keyToggle, useRawInput
-        enabled = True
-        if useRawInput and not self.raw_listener.isRunning():
-            self.raw_listener.start()
-        self.worker.start_loop()
+    def updateStartStopButtonText(self):
+        """Updates the text of the Start/Stop button based on the global 'enabled' state."""
+        self.startStopButton.setText("Stop" if enabled else "Start")
+
+    def toggleTracking(self):
+            """Handles starting and stopping the tracking when the button is pressed."""
+            global enabled, keyToggle, useRawInput, mouseDeltaY
+
+            if enabled:
+                enabled = False
+                self.worker.stop_loop()
+                
+                mouseDeltaY = 0
+
+                print("Tracking stopped via GUI button.")
+            else:
+                enabled = True
+                if useRawInput and not self.raw_listener.isRunning():
+                    self.raw_listener.start()
+                
+                if not self.worker.isRunning():
+                    self.worker.start_loop()
+                    print("Tracking started.")
+                else:
+                    print("Worker is already running or being started.")
+                
+            self.updateStartStopButtonText()
 
     def openCurveEditor(self):
         self.curveWindow = CurveEditorWindow()
@@ -333,10 +354,16 @@ def onPress(key):
         aKey = key
     elif enabled:
         if key == quitKey:
+            global mouseDeltaY
             enabled = False
             window.worker.stop_loop()
+            
+            mouseDeltaY = 0
+
             if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
                 window.curveWindow.clear_current_input()
+            
+            window.updateStartStopButtonText() 
 
             print("Stopped with", quitKey)
         elif key == aKey:
@@ -370,7 +397,6 @@ def cleanup():
         window.worker.stop_loop()
         window.worker.wait()
     
-    # Clean up raw listener thread
     if hasattr(window, "raw_listener") and window.raw_listener.isRunning():
         window.raw_listener.stop()
         window.raw_listener.wait()
