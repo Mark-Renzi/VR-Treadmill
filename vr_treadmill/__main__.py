@@ -447,10 +447,18 @@ class MainWindow(QWidget):
             "poll_rate": self.pollRateLine.text(),
             "average_count": self.avgLine.text(),
             "smoothing_type": smoothingType,
-            "raw_input": useRawInput
+            "raw_input": useRawInput,
+            "stop_key": str(quitKey),
+            "a_key": str(aKey),
+            "recenter_key": str(recenterToggleKey),
+            "recenter_enabled": recenterEnabled,
+            "curve_editor_open": hasattr(self, "curveWindow") and self.curveWindow.isVisible(),
+            "show_input_on_curve": self.showDotCheckbox.isChecked()
         }
 
     def apply_config(self, config):
+        global quitKey, aKey, recenterToggleKey, recenterEnabled
+
         self.senseLine.setText(str(config.get("sensitivity", "100")))
         self.pollRateLine.setText(str(config.get("poll_rate", "60")))
         self.avgLine.setText(str(config.get("average_count", "5")))
@@ -464,6 +472,32 @@ class MainWindow(QWidget):
             self.maxRadio.setChecked(True)
 
         self.rawInputCheckbox.setChecked(config.get("raw_input", True))
+
+        # Restore key binds
+        quitKey = self._key_from_string(config.get("stop_key", str(Key.ctrl_r)))
+        aKey = self._key_from_string(config.get("a_key", str(Key.alt_gr)))
+        recenterToggleKey = self._key_from_string(config.get("recenter_key", str(Key.f9)))
+        recenterEnabled = config.get("recenter_enabled", False)
+
+        self.keyLabel.setText(f"Stop Key: {quitKey}")
+        self.aKeyLabel.setText(f"A Button Key: {aKey}")
+        if not useRawInput:
+            self.recenterKeyLabel.setText(f"Recenter Toggle Key: {recenterToggleKey}")
+
+        if config.get("curve_editor_open", False):
+            self.openCurveEditor()
+
+        self.showDotCheckbox.setChecked(config.get("show_input_on_curve", False))
+    
+    def _key_from_string(self, key_str):
+        try:
+            if key_str.startswith("Key."):
+                return getattr(Key, key_str[4:])
+            else:
+                return key_str
+        except Exception as e:
+            print(f"Failed to parse key from string '{key_str}': {e}")
+            return Key.ctrl_r
 
     def save_config(self):
         name, ok = QInputDialog.getText(self, "Save Config", "Enter config name:")
