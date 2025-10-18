@@ -1,3 +1,5 @@
+import os
+import json
 import signal
 import sys
 import time
@@ -15,6 +17,8 @@ from PyQt6.QtWidgets import (
     QRadioButton,
     QGroupBox,
     QHBoxLayout,
+    QComboBox,
+    QInputDialog,
 )
 import vgamepad as vg
 from vr_treadmill.curve_editor import CurveEditorWindow
@@ -48,6 +52,9 @@ SMOOTHING_TYPE_MEAN = 0
 SMOOTHING_TYPE_MEDIAN = 1
 SMOOTHING_TYPE_MAX = 2
 smoothingType = SMOOTHING_TYPE_MEAN
+
+CONFIG_DIR = "./configs"
+os.makedirs(CONFIG_DIR, exist_ok=True)
 
 
 class JoystickWorker(QtCore.QThread):
@@ -211,6 +218,15 @@ class MainWindow(QWidget):
         h_layout.addWidget(self.maxRadio)
         self.smoothingGroup.setLayout(h_layout)
 
+        self.configDropdown = QComboBox()
+        self.loadConfigButton = QPushButton("Load Config")
+        self.saveConfigButton = QPushButton("Save Config")
+
+        self.loadConfigButton.clicked.connect(self.load_config)
+        self.saveConfigButton.clicked.connect(lambda: self.save_config())
+
+        self.update_config_dropdown()
+
         layout = QVBoxLayout()
         layout.addWidget(self.startStopButton)
         layout.addWidget(senseLabel)
@@ -229,6 +245,10 @@ class MainWindow(QWidget):
         layout.addWidget(self.rawInputCheckbox)
         layout.addWidget(self.openCurveEditorButton)
         layout.addWidget(self.showDotCheckbox)
+        layout.addWidget(QLabel("Config:"))
+        layout.addWidget(self.configDropdown)
+        layout.addWidget(self.loadConfigButton)
+        layout.addWidget(self.saveConfigButton)
 
         self.setLayout(layout)
         self.show()
@@ -382,6 +402,7 @@ class MainWindow(QWidget):
                 self.raw_listener.start()
             
             if not self.worker.isRunning():
+                self.save_config(name="latest_config")
                 self.worker.start_loop()
                 print("Tracking started.")
             else:
@@ -420,6 +441,106 @@ class MainWindow(QWidget):
             self.setRecenterKeyButton.setText("Set Recenter Toggle Key")
             print("Recenter toggle key confirmed.")
             recenterKeyToggle = False
+
+    def get_current_config(self):
+        return {
+            "sensitivity": self.senseLine.text(),
+            "poll_rate": self.pollRateLine.text(),
+            "average_count": self.avgLine.text(),
+            "smoothing_type": smoothingType,
+            "raw_input": useRawInput,
+            "stop_key": str(quitKey),
+            "a_key": str(aKey),
+            "recenter_key": str(recenterToggleKey),
+            "recenter_enabled": recenterEnabled,
+            "curve_editor_open": hasattr(self, "curveWindow") and self.curveWindow.isVisible(),
+            "show_input_on_curve": self.showDotCheckbox.isChecked(),
+            "curve_points": self.curveWindow.serialize_points() if hasattr(self, "curveWindow") else None,
+        }
+
+    def apply_config(self, config):
+        global quitKey, aKey, recenterToggleKey, recenterEnabled
+
+        self.senseLine.setText(str(config.get("sensitivity", "100")))
+        self.pollRateLine.setText(str(config.get("poll_rate", "60")))
+        self.avgLine.setText(str(config.get("average_count", "5")))
+
+        smoothing = config.get("smoothing_type", SMOOTHING_TYPE_MEAN)
+        if smoothing == SMOOTHING_TYPE_MEAN:
+            self.meanRadio.setChecked(True)
+        elif smoothing == SMOOTHING_TYPE_MEDIAN:
+            self.medianRadio.setChecked(True)
+        elif smoothing == SMOOTHING_TYPE_MAX:
+            self.maxRadio.setChecked(True)
+
+        self.rawInputCheckbox.setChecked(config.get("raw_input", True))
+
+        # Restore key binds
+        quitKey = self._key_from_string(config.get("stop_key", str(Key.ctrl_r)))
+        aKey = self._key_from_string(config.get("a_key", str(Key.alt_gr)))
+        recenterToggleKey = self._key_from_string(config.get("recenter_key", str(Key.f9)))
+        recenterEnabled = config.get("recenter_enabled", False)
+
+        self.keyLabel.setText(f"Stop Key: {quitKey}")
+        self.aKeyLabel.setText(f"A Button Key: {aKey}")
+        if not useRawInput:
+            self.recenterKeyLabel.setText(f"Recenter Toggle Key: {recenterToggleKey}")
+
+        if config.get("curve_editor_open", False):
+            self.openCurveEditor()
+
+            points_data = config.get("curve_points")
+            if points_data and hasattr(self, "curveWindow"):
+                self.curveWindow.deserialize_points(points_data)
+
+        self.showDotCheckbox.setChecked(config.get("show_input_on_curve", False))
+    
+    def _key_from_string(self, key_str):
+        try:
+            if key_str.startswith("Key."):
+                return getattr(Key, key_str[4:])
+            else:
+                return key_str
+        except Exception as e:
+            print(f"Failed to parse key from string '{key_str}': {e}")
+            return Key.ctrl_r
+
+    def save_config(self, name=None):
+        if name is None:
+            text, ok = QInputDialog.getText(self, "Save Config", "Enter config name:")
+            if not ok or not text.strip():
+                print("Save cancelled or name was empty.")
+                return
+            name = text.strip()
+
+        config = self.get_current_config()
+        path = os.path.join(CONFIG_DIR, f"{name}.json")
+        try:
+            with open(path, "w") as f:
+                json.dump(config, f, indent=4)
+            print(f"Config '{name}' saved.")
+            self.update_config_dropdown()
+        except Exception as e:
+            print(f"Failed to save config: {e}")
+
+    def load_config(self):
+        name = self.configDropdown.currentText()
+        if not name:
+            return
+        path = os.path.join(CONFIG_DIR, f"{name}.json")
+        try:
+            with open(path, "r") as f:
+                config = json.load(f)
+                self.apply_config(config)
+                print(f"Config '{name}' loaded.")
+        except Exception as e:
+            print(f"Failed to load config '{name}': {e}")
+
+    def update_config_dropdown(self):
+        self.configDropdown.clear()
+        configs = [f[:-5] for f in os.listdir(CONFIG_DIR) if f.endswith(".json")]
+        self.configDropdown.addItems(sorted(configs))
+
 
 
 def onPress(key):

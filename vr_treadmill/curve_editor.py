@@ -29,6 +29,20 @@ class CurveEditorWindow(QWidget):
 
         self.setMouseTracking(True)
 
+    def serialize_points(self):
+        """Convert QPointF list into serializable list of tuples."""
+        return [(point.x(), point.y()) for point in self.points]
+
+    def deserialize_points(self, data):
+        """Convert list of (x, y) tuples back into QPointF points."""
+        if isinstance(data, list):
+            try:
+                self.points = [QPointF(float(x), float(y)) for x, y in data]
+                self.dirty = True
+                self.update()
+            except Exception as e:
+                print(f"Failed to load curve points: {e}")
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
