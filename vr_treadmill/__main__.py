@@ -223,7 +223,7 @@ class MainWindow(QWidget):
         self.saveConfigButton = QPushButton("Save Config")
 
         self.loadConfigButton.clicked.connect(self.load_config)
-        self.saveConfigButton.clicked.connect(self.save_config)
+        self.saveConfigButton.clicked.connect(lambda: self.save_config())
 
         self.update_config_dropdown()
 
@@ -402,6 +402,7 @@ class MainWindow(QWidget):
                 self.raw_listener.start()
             
             if not self.worker.isRunning():
+                self.save_config(name="latest_config")
                 self.worker.start_loop()
                 print("Tracking started.")
             else:
@@ -504,18 +505,23 @@ class MainWindow(QWidget):
             print(f"Failed to parse key from string '{key_str}': {e}")
             return Key.ctrl_r
 
-    def save_config(self):
-        name, ok = QInputDialog.getText(self, "Save Config", "Enter config name:")
-        if ok and name:
-            config = self.get_current_config()
-            path = os.path.join(CONFIG_DIR, f"{name}.json")
-            try:
-                with open(path, "w") as f:
-                    json.dump(config, f, indent=4)
-                print(f"Config '{name}' saved.")
-                self.update_config_dropdown()
-            except Exception as e:
-                print(f"Failed to save config: {e}")
+    def save_config(self, name=None):
+        if name is None:
+            text, ok = QInputDialog.getText(self, "Save Config", "Enter config name:")
+            if not ok or not text.strip():
+                print("Save cancelled or name was empty.")
+                return
+            name = text.strip()
+
+        config = self.get_current_config()
+        path = os.path.join(CONFIG_DIR, f"{name}.json")
+        try:
+            with open(path, "w") as f:
+                json.dump(config, f, indent=4)
+            print(f"Config '{name}' saved.")
+            self.update_config_dropdown()
+        except Exception as e:
+            print(f"Failed to save config: {e}")
 
     def load_config(self):
         name = self.configDropdown.currentText()
