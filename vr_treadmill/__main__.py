@@ -15,17 +15,21 @@ from PyQt6.QtWidgets import (
 )
 import vgamepad as vg
 from vr_treadmill.curve_editor import CurveEditorWindow
+from vr_treadmill.raw_mouse_listener import RawMouseListener 
 
 gamepad = vg.VX360Gamepad()
 mouse = Controller()
 enabled = False
+
+useRawInput = True
+mouseDeltaY = 0
 
 keyToggle = False
 
 aKey = Key.alt_gr
 aKeyToggle = False
 
-recenterEnabled = True
+recenterEnabled = False
 recenterToggleKey = Key.f9
 recenterKeyToggle = False
 
@@ -51,12 +55,23 @@ class JoystickWorker(QtCore.QThread):
         self.running = False
 
     def run(self):
-        global sensitivity, pollRate, window, recenterEnabled
+        global sensitivity, pollRate, window, recenterEnabled, useRawInput, mouseDeltaY
 
         while enabled and not keyToggle:
             cycle_start = time.perf_counter()
             current_sensitivity = sensitivity
-            delta_y = mouse.position[1] - 500
+            
+            if useRawInput:
+                # Use the accumulated delta from the raw input listener
+                # Reset the delta for the next cycle
+                delta_y = mouseDeltaY
+                mouseDeltaY = 0 
+            else:
+                # Traditional polling and recentering logic
+                delta_y = mouse.position[1] - 500
+                if recenterEnabled:
+                    mouse.position = (700, 500)
+            
             scaled_input = abs(delta_y) * current_sensitivity
 
             # Emit signal to update the curve editor with current input
@@ -76,7 +91,6 @@ class JoystickWorker(QtCore.QThread):
             else:
                 output_magnitude = scaled_input
 
-            # Use the curve editor to transform the input (in main thread)
             if delta_y > 0:
                 mousey = -int(output_magnitude)
             elif delta_y < 0:
@@ -85,14 +99,14 @@ class JoystickWorker(QtCore.QThread):
                 mousey = 0
 
             clamped_mousey = max(-32768, min(32767, mousey))
-            if recenterEnabled:
-                mouse.position = (700, 500)
+            
             print("Joystick y:", clamped_mousey)
 
             gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
             gamepad.update()
 
             elapsed = time.perf_counter() - cycle_start
+            
             sleep_time = max(0, (1 / pollRate) - elapsed)
             time.sleep(sleep_time)
 
@@ -103,11 +117,14 @@ class MainWindow(QWidget):
 
         self.worker = JoystickWorker()
         self.worker.update_input.connect(self.update_curve_input)
+        
+        self.raw_listener = RawMouseListener()
+        self.raw_listener.delta_signal.connect(self.update_mouse_delta)
 
         self.setWindowTitle("Maratron")
 
-        self.startJoy = QPushButton("Start")
-        self.startJoy.clicked.connect(self.run)
+        self.startStopButton = QPushButton("Start")
+        self.startStopButton.clicked.connect(self.toggleTracking)
 
         self.setKeyButton = QPushButton("Set Stop Key")
         self.setKeyButton.clicked.connect(self.setKey)
@@ -120,7 +137,7 @@ class MainWindow(QWidget):
         self.setRecenterKeyButton = QPushButton("Set Recenter Toggle Key")
         self.setRecenterKeyButton.clicked.connect(self.setRecenterKey)
 
-        self.recenterKeyLabel = QLabel(f"Recenter Toggle Key: {recenterToggleKey}")
+        self.recenterKeyLabel = QLabel(f"Recenter disabled (Raw Input ON)")
 
         pollLabel = QLabel("Polling Rate (/sec):")
         senseLabel = QLabel("Sensitivity:")
@@ -137,9 +154,16 @@ class MainWindow(QWidget):
         self.openCurveEditorButton.clicked.connect(self.openCurveEditor)
 
         self.showDotCheckbox = QCheckBox("Show Input on Curve")
+        
+        self.rawInputCheckbox = QCheckBox("Use Raw Input (Windows)")
+        self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
+        self.rawInputCheckbox.setChecked(useRawInput)
+
+        self.setRecenterKeyButton.setEnabled(not useRawInput)
+
 
         layout = QVBoxLayout()
-        layout.addWidget(self.startJoy)
+        layout.addWidget(self.startStopButton)
         layout.addWidget(senseLabel)
         layout.addWidget(self.senseLine)
         layout.addWidget(pollLabel)
@@ -150,6 +174,7 @@ class MainWindow(QWidget):
         layout.addWidget(self.setAKeyButton)
         layout.addWidget(self.recenterKeyLabel)
         layout.addWidget(self.setRecenterKeyButton)
+        layout.addWidget(self.rawInputCheckbox)
         layout.addWidget(self.openCurveEditorButton)
         layout.addWidget(self.showDotCheckbox)
 
@@ -160,6 +185,28 @@ class MainWindow(QWidget):
         self.validSensitivity = True
         self.validPollRate = True
 
+    def toggleRawInput(self, state):
+        global useRawInput, recenterEnabled
+        useRawInput = (state == 2)
+        
+        # Disable recentering when raw input is on
+        if useRawInput:
+            recenterEnabled = False
+            self.recenterKeyLabel.setText("Recenter disabled (Raw Input ON)")
+            self.setRecenterKeyButton.setEnabled(False)
+            print("Raw Input ON. Mouse recentering OFF.")
+        else:
+            self.setRecenterKeyButton.setEnabled(True)
+            self.recenterKeyLabel.setText(f"Recenter Toggle Key: {recenterToggleKey}")
+            print("Raw Input OFF.")
+
+    @QtCore.pyqtSlot(int, int)
+    def update_mouse_delta(self, dx, dy):
+        """Accumulate mouse deltas from the RawMouseListener thread."""
+        global mouseDeltaY
+        mouseDeltaY += dy
+
+
     def update_curve_input(self, input_value: int):
         if (
             hasattr(self, "curveWindow")
@@ -169,7 +216,7 @@ class MainWindow(QWidget):
             self.curveWindow.set_current_input(input_value)
 
     def updateStartButton(self):
-        self.startJoy.setEnabled(self.validSensitivity and self.validPollRate)
+        self.startStopButton.setEnabled(self.validSensitivity and self.validPollRate)
 
     def setPollingRate(self, value):
         global pollRate
@@ -230,10 +277,33 @@ class MainWindow(QWidget):
             print("Confirmed")
             keyToggle = False
 
-    def run(self):
-        global enabled, keyToggle
-        enabled = True
-        self.worker.start_loop()
+    def updateStartStopButtonText(self):
+        """Updates the text of the Start/Stop button based on the global 'enabled' state."""
+        self.startStopButton.setText("Stop" if enabled else "Start")
+
+    def toggleTracking(self):
+            """Handles starting and stopping the tracking when the button is pressed."""
+            global enabled, keyToggle, useRawInput, mouseDeltaY
+
+            if enabled:
+                enabled = False
+                self.worker.stop_loop()
+                
+                mouseDeltaY = 0
+
+                print("Tracking stopped via GUI button.")
+            else:
+                enabled = True
+                if useRawInput and not self.raw_listener.isRunning():
+                    self.raw_listener.start()
+                
+                if not self.worker.isRunning():
+                    self.worker.start_loop()
+                    print("Tracking started.")
+                else:
+                    print("Worker is already running or being started.")
+                
+            self.updateStartStopButtonText()
 
     def openCurveEditor(self):
         self.curveWindow = CurveEditorWindow()
@@ -276,7 +346,9 @@ def onPress(key):
         aKeyToggle, \
         aKey, \
         recenterToggleKey, \
-        recenterEnabled
+        recenterEnabled, \
+        useRawInput
+        
     if keyToggle:
         print("Stop key will be", str(key))
         quitKey = key
@@ -285,10 +357,16 @@ def onPress(key):
         aKey = key
     elif enabled:
         if key == quitKey:
+            global mouseDeltaY
             enabled = False
             window.worker.stop_loop()
+            
+            mouseDeltaY = 0
+
             if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
                 window.curveWindow.clear_current_input()
+            
+            window.updateStartStopButtonText() 
 
             print("Stopped with", quitKey)
         elif key == aKey:
@@ -298,7 +376,8 @@ def onPress(key):
         elif recenterKeyToggle:
             print("Recenter toggle key will be", str(key))
             recenterToggleKey = key
-        elif key == recenterToggleKey:
+        # Only allow recenter toggle if raw input is NOT enabled
+        elif key == recenterToggleKey and not useRawInput:
             recenterEnabled = not recenterEnabled
             print(f"Mouse recentering {'enabled' if recenterEnabled else 'disabled'}")
 
@@ -320,6 +399,10 @@ def cleanup():
     if hasattr(window, "worker") and window.worker.isRunning():
         window.worker.stop_loop()
         window.worker.wait()
+    
+    if hasattr(window, "raw_listener") and window.raw_listener.isRunning():
+        window.raw_listener.stop()
+        window.raw_listener.wait()
 
     if listener.running:
         listener.stop()
