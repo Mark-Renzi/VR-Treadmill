@@ -33,7 +33,7 @@ class CurveEditorWindow(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        graph_rect = self.rect().adjusted(0, 0, 0, -50)  # leave space for label below
+        graph_rect = self.rect().adjusted(0, 0, 0, 0)
         painter.fillRect(graph_rect, Qt.GlobalColor.white)
 
         painter.setPen(QPen(Qt.GlobalColor.black, 2))
@@ -57,6 +57,11 @@ class CurveEditorWindow(QWidget):
             self.margin,
             self.margin + self.graph_height + 30,
             "Left-click + drag to move. Double-click to add. Right-click to delete.",
+        )
+        painter.drawText(
+            self.margin,
+            self.margin + self.graph_height + 50,
+            "Keep window open to apply curve.",
         )
 
         if self.current_input is not None:
