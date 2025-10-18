@@ -1,6 +1,5 @@
 import ctypes
 import ctypes.wintypes as wintypes
-import struct
 import sys
 
 user32 = ctypes.windll.user32
