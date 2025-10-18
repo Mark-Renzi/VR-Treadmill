@@ -21,7 +21,7 @@ gamepad = vg.VX360Gamepad()
 mouse = Controller()
 enabled = False
 
-useRawInput = False
+useRawInput = True
 mouseDeltaY = 0
 
 keyToggle = False
@@ -29,7 +29,7 @@ keyToggle = False
 aKey = Key.alt_gr
 aKeyToggle = False
 
-recenterEnabled = True
+recenterEnabled = False
 recenterToggleKey = Key.f9
 recenterKeyToggle = False
 
@@ -137,7 +137,7 @@ class MainWindow(QWidget):
         self.setRecenterKeyButton = QPushButton("Set Recenter Toggle Key")
         self.setRecenterKeyButton.clicked.connect(self.setRecenterKey)
 
-        self.recenterKeyLabel = QLabel(f"Recenter Toggle Key: {recenterToggleKey}")
+        self.recenterKeyLabel = QLabel(f"Recenter disabled (Raw Input ON)")
 
         pollLabel = QLabel("Polling Rate (/sec):")
         senseLabel = QLabel("Sensitivity:")
@@ -155,8 +155,11 @@ class MainWindow(QWidget):
 
         self.showDotCheckbox = QCheckBox("Show Input on Curve")
         
-        self.rawInputCheckbox = QCheckBox("Use Raw Input (Disables Recenter)")
+        self.rawInputCheckbox = QCheckBox("Use Raw Input (Windows only)")
         self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
+        self.rawInputCheckbox.setChecked(useRawInput)
+
+        self.setRecenterKeyButton.setEnabled(not useRawInput)
 
 
         layout = QVBoxLayout()
