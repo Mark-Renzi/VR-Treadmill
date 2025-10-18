@@ -453,7 +453,8 @@ class MainWindow(QWidget):
             "recenter_key": str(recenterToggleKey),
             "recenter_enabled": recenterEnabled,
             "curve_editor_open": hasattr(self, "curveWindow") and self.curveWindow.isVisible(),
-            "show_input_on_curve": self.showDotCheckbox.isChecked()
+            "show_input_on_curve": self.showDotCheckbox.isChecked(),
+            "curve_points": self.curveWindow.serialize_points() if hasattr(self, "curveWindow") else None,
         }
 
     def apply_config(self, config):
@@ -486,6 +487,10 @@ class MainWindow(QWidget):
 
         if config.get("curve_editor_open", False):
             self.openCurveEditor()
+
+            points_data = config.get("curve_points")
+            if points_data and hasattr(self, "curveWindow"):
+                self.curveWindow.deserialize_points(points_data)
 
         self.showDotCheckbox.setChecked(config.get("show_input_on_curve", False))
     
