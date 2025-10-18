@@ -155,7 +155,7 @@ class MainWindow(QWidget):
 
         self.showDotCheckbox = QCheckBox("Show Input on Curve")
         
-        self.rawInputCheckbox = QCheckBox("Use Raw Input (Windows only)")
+        self.rawInputCheckbox = QCheckBox("Use Raw Input (Windows)")
         self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
         self.rawInputCheckbox.setChecked(useRawInput)
 
