@@ -34,9 +34,10 @@ recenterToggleKey = Key.f9
 recenterKeyToggle = False
 
 # -------------------------------------------------------------------
-sensitivity = 400  # How sensitive the joystick will be
+sensitivity = 100  # How sensitive the joystick will be
 pollRate = 60  # How many times per second the mouse will be checked
 quitKey = Key.ctrl_r  # Which key will stop the program
+averageCount = 5  # Number of data points in the smoothing window.
 # -------------------------------------------------------------------
 
 
@@ -46,6 +47,7 @@ class JoystickWorker(QtCore.QThread):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.running = False
+        self.mouseDeltaHistory = []
 
     def start_loop(self):
         self.running = True
@@ -53,9 +55,10 @@ class JoystickWorker(QtCore.QThread):
 
     def stop_loop(self):
         self.running = False
+        self.mouseDeltaHistory = []
 
     def run(self):
-        global sensitivity, pollRate, window, recenterEnabled, useRawInput, mouseDeltaY
+        global sensitivity, pollRate, window, recenterEnabled, useRawInput, mouseDeltaY, averageCount
 
         while enabled and not keyToggle:
             cycle_start = time.perf_counter()
@@ -63,31 +66,37 @@ class JoystickWorker(QtCore.QThread):
             
             if useRawInput:
                 # Use the accumulated delta from the raw input listener
-                # Reset the delta for the next cycle
-                delta_y = mouseDeltaY
-                mouseDeltaY = 0 
+                delta_y_current = mouseDeltaY
+                mouseDeltaY = 0 # Reset the delta for the next cycle
             else:
                 # Traditional polling and recentering logic
-                delta_y = mouse.position[1] - 500
+                delta_y_current = mouse.position[1] - 500
                 if recenterEnabled:
                     mouse.position = (700, 500)
             
-            scaled_input = abs(delta_y) * current_sensitivity
+            self.mouseDeltaHistory.append(delta_y_current)
+            
+            if len(self.mouseDeltaHistory) > averageCount:
+                self.mouseDeltaHistory = self.mouseDeltaHistory[-averageCount:]
 
-            # Emit signal to update the curve editor with current input
-            self.update_input.emit(min(int(scaled_input), 32767))
+            if self.mouseDeltaHistory:
+                delta_y = sum(self.mouseDeltaHistory) / len(self.mouseDeltaHistory)
+            else:
+                delta_y = 0
+            
+            scaled_input = abs(delta_y) * current_sensitivity
 
             use_curve = (
                 hasattr(window, "curveWindow") and window.curveWindow.isVisible()
             )
-            show_dot = window.showDotCheckbox.isChecked()
 
             if use_curve:
                 curve_lut = window.curveWindow.get_or_build_curve_mapping()
                 output_magnitude = window.interpolate_curve(scaled_input, curve_lut)
 
+                show_dot = window.showDotCheckbox.isChecked()
                 if show_dot:
-                    window.curveWindow.set_current_input(int(min(scaled_input, 32767)))
+                    self.update_input.emit(min(int(abs(delta_y) * current_sensitivity), 32767))
             else:
                 output_magnitude = scaled_input
 
@@ -141,7 +150,7 @@ class MainWindow(QWidget):
 
         pollLabel = QLabel("Polling Rate (/sec):")
         senseLabel = QLabel("Sensitivity:")
-
+        avgLabel = QLabel("Data Points to Average (1 = Off):")
         self.keyLabel = QLabel(f"Stop Key: {quitKey}")
 
         self.pollRateLine = QLineEdit(str(pollRate))
@@ -149,6 +158,9 @@ class MainWindow(QWidget):
 
         self.senseLine = QLineEdit(str(sensitivity))
         self.senseLine.textChanged.connect(self.setSensitivity)
+        
+        self.avgLine = QLineEdit(str(averageCount))
+        self.avgLine.textChanged.connect(self.setAverageCount)
 
         self.openCurveEditorButton = QPushButton("Edit Sensitivity Curve")
         self.openCurveEditorButton.clicked.connect(self.openCurveEditor)
@@ -168,6 +180,8 @@ class MainWindow(QWidget):
         layout.addWidget(self.senseLine)
         layout.addWidget(pollLabel)
         layout.addWidget(self.pollRateLine)
+        layout.addWidget(avgLabel)
+        layout.addWidget(self.avgLine)
         layout.addWidget(self.keyLabel)
         layout.addWidget(self.setKeyButton)
         layout.addWidget(self.aKeyLabel)
@@ -184,6 +198,7 @@ class MainWindow(QWidget):
         # Input validation tracking
         self.validSensitivity = True
         self.validPollRate = True
+        self.validAverageCount = True
 
     def toggleRawInput(self, state):
         global useRawInput, recenterEnabled
@@ -216,7 +231,9 @@ class MainWindow(QWidget):
             self.curveWindow.set_current_input(input_value)
 
     def updateStartButton(self):
-        self.startStopButton.setEnabled(self.validSensitivity and self.validPollRate)
+        self.startStopButton.setEnabled(
+            self.validSensitivity and self.validPollRate and self.validAverageCount
+        )
 
     def setPollingRate(self, value):
         global pollRate
@@ -244,6 +261,22 @@ class MainWindow(QWidget):
         except ValueError:
             self.validSensitivity = False
             print("Invalid sensitivity")
+        self.updateStartButton()
+
+    def setAverageCount(self, value):
+        global averageCount
+        try:
+            val = int(value)
+            if val <= 0:
+                raise ValueError
+            averageCount = val
+            self.validAverageCount = True
+            print("Averaging count:", val)
+            if self.worker.isRunning():
+                self.worker.mouseDeltaHistory = []
+        except ValueError:
+            self.validAverageCount = False
+            print("Invalid averaging count (must be a positive integer)")
         self.updateStartButton()
 
     def setAKey(self):
@@ -282,28 +315,28 @@ class MainWindow(QWidget):
         self.startStopButton.setText("Stop" if enabled else "Start")
 
     def toggleTracking(self):
-            """Handles starting and stopping the tracking when the button is pressed."""
-            global enabled, keyToggle, useRawInput, mouseDeltaY
+        """Handles starting and stopping the tracking when the button is pressed."""
+        global enabled, keyToggle, useRawInput, mouseDeltaY
 
-            if enabled:
-                enabled = False
-                self.worker.stop_loop()
-                
-                mouseDeltaY = 0
+        if enabled:
+            enabled = False
+            self.worker.stop_loop()
+            
+            mouseDeltaY = 0
 
-                print("Tracking stopped via GUI button.")
+            print("Tracking stopped via GUI button.")
+        else:
+            enabled = True
+            if useRawInput and not self.raw_listener.isRunning():
+                self.raw_listener.start()
+            
+            if not self.worker.isRunning():
+                self.worker.start_loop()
+                print("Tracking started.")
             else:
-                enabled = True
-                if useRawInput and not self.raw_listener.isRunning():
-                    self.raw_listener.start()
-                
-                if not self.worker.isRunning():
-                    self.worker.start_loop()
-                    print("Tracking started.")
-                else:
-                    print("Worker is already running or being started.")
-                
-            self.updateStartStopButtonText()
+                print("Worker is already running or being started.")
+            
+        self.updateStartStopButtonText()
 
     def openCurveEditor(self):
         self.curveWindow = CurveEditorWindow()
@@ -415,7 +448,7 @@ def cleanup():
     sys.exit(0)
 
 
-# Handle SIGINT (Ctrl+C) properly
+# handle CTRL+C
 signal.signal(signal.SIGINT, lambda sig, frame: cleanup())
 
 
