@@ -132,11 +132,19 @@ class JoystickWorker(QtCore.QThread):
                     output_magnitude = window.interpolate_curve(scaled_input, curve_lut)
 
                     if window.showDotCheckbox.isChecked():
-                        self.update_input.emit(min(int(abs(delta_y) * current_sensitivity), 32767))
+                        self.update_input.emit(
+                            min(int(abs(delta_y) * current_sensitivity), 32767)
+                        )
                 else:
                     output_magnitude = scaled_input
 
-                mousey = -int(output_magnitude) if delta_y > 0 else int(output_magnitude) if delta_y < 0 else 0
+                mousey = (
+                    -int(output_magnitude)
+                    if delta_y > 0
+                    else int(output_magnitude)
+                    if delta_y < 0
+                    else 0
+                )
                 clamped_mousey = max(-32768, min(32767, mousey))
 
                 print("Joystick y:", clamped_mousey)
