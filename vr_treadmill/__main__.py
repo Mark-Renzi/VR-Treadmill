@@ -96,7 +96,6 @@ class JoystickWorker(QtCore.QThread):
                 current_sensitivity = sensitivity
 
                 if useRawInput:
-                    # Thread-safe read and reset of shared delta
                     with mouseDeltaLock:
                         delta_y_current = mouseDeltaY
                         mouseDeltaY = 0
