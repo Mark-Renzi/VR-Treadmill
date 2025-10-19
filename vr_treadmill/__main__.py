@@ -278,10 +278,20 @@ class MainWindow(QWidget):
         self.setLayout(layout)
         self.show()
 
-        # Input validation tracking
         self.validSensitivity = True
         self.validPollRate = True
         self.validAverageCount = True
+
+        latest_config_path = os.path.join(CONFIG_DIR, "last run config.json")
+        if os.path.exists(latest_config_path):
+            try:
+                with open(latest_config_path, "r") as f:
+                    config = json.load(f)
+                    self.apply_config(config)
+                    print("Loaded last run config on startup.")
+            except Exception as e:
+                print(f"Failed to load last run config: {e}")
+
 
     def toggleRawInput(self, state):
         global useRawInput, recenterEnabled
@@ -427,7 +437,7 @@ class MainWindow(QWidget):
                 self.raw_listener.start()
 
             if not self.worker.isRunning():
-                self.save_config(name="latest_config")
+                self.save_config(name="last run config")
                 self.worker.start_loop()
                 print("Tracking started.")
             else:
