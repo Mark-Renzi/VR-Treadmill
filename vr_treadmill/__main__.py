@@ -84,73 +84,70 @@ class JoystickWorker(QtCore.QThread):
             averageCount, \
             smoothingType
 
+        next_time = time.perf_counter()
+
         while enabled and not keyToggle:
-            cycle_start = time.perf_counter()
-            current_sensitivity = sensitivity
+            now = time.perf_counter()
 
-            if useRawInput:
-                # Use the accumulated delta from the raw input listener
-                delta_y_current = mouseDeltaY
-                mouseDeltaY = 0  # Reset the delta for the next cycle
-            else:
-                # Traditional polling and recentering logic
-                delta_y_current = mouse.position[1] - 500
-                if recenterEnabled:
-                    mouse.position = (700, 500)
+            if now >= next_time:
+                current_sensitivity = sensitivity
 
-            self.mouseDeltaHistory.append(delta_y_current)
-
-            if len(self.mouseDeltaHistory) > averageCount:
-                self.mouseDeltaHistory = self.mouseDeltaHistory[-averageCount:]
-
-            if self.mouseDeltaHistory:
-                if smoothingType == SMOOTHING_TYPE_MEAN:
-                    delta_y = statistics.mean(self.mouseDeltaHistory)
-                elif smoothingType == SMOOTHING_TYPE_MEDIAN:
-                    delta_y = statistics.median(self.mouseDeltaHistory)
-                elif smoothingType == SMOOTHING_TYPE_MAX:
-                    delta_y = max(self.mouseDeltaHistory, key=abs)
+                if useRawInput:
+                    delta_y_current = mouseDeltaY
+                    mouseDeltaY = 0
                 else:
-                    delta_y = statistics.mean(self.mouseDeltaHistory)
+                    delta_y_current = mouse.position[1] - 500
+                    if recenterEnabled:
+                        mouse.position = (700, 500)
+
+                self.mouseDeltaHistory.append(delta_y_current)
+
+                if len(self.mouseDeltaHistory) > averageCount:
+                    self.mouseDeltaHistory = self.mouseDeltaHistory[-averageCount:]
+
+                if self.mouseDeltaHistory:
+                    if smoothingType == SMOOTHING_TYPE_MEAN:
+                        delta_y = statistics.mean(self.mouseDeltaHistory)
+                    elif smoothingType == SMOOTHING_TYPE_MEDIAN:
+                        delta_y = statistics.median(self.mouseDeltaHistory)
+                    elif smoothingType == SMOOTHING_TYPE_MAX:
+                        delta_y = max(self.mouseDeltaHistory, key=abs)
+                    else:
+                        delta_y = statistics.mean(self.mouseDeltaHistory)
+                else:
+                    delta_y = 0
+
+                scaled_input = abs(delta_y) * current_sensitivity
+
+                use_curve = (
+                    hasattr(window, "curveWindow") and window.curveWindow.isVisible()
+                )
+
+                if use_curve:
+                    curve_lut = window.curveWindow.get_or_build_curve_mapping()
+                    output_magnitude = window.interpolate_curve(scaled_input, curve_lut)
+
+                    if window.showDotCheckbox.isChecked():
+                        self.update_input.emit(min(int(abs(delta_y) * current_sensitivity), 32767))
+                else:
+                    output_magnitude = scaled_input
+
+                mousey = -int(output_magnitude) if delta_y > 0 else int(output_magnitude) if delta_y < 0 else 0
+                clamped_mousey = max(-32768, min(32767, mousey))
+
+                print("Joystick y:", clamped_mousey)
+
+                gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
+                gamepad.update()
+
+                # Schedule next run
+                next_time += 1.0 / pollRate
+
+                # Catch up if behind
+                if now > next_time:
+                    next_time = now
             else:
-                delta_y = 0
-
-            scaled_input = abs(delta_y) * current_sensitivity
-
-            use_curve = (
-                hasattr(window, "curveWindow") and window.curveWindow.isVisible()
-            )
-
-            if use_curve:
-                curve_lut = window.curveWindow.get_or_build_curve_mapping()
-                output_magnitude = window.interpolate_curve(scaled_input, curve_lut)
-
-                show_dot = window.showDotCheckbox.isChecked()
-                if show_dot:
-                    self.update_input.emit(
-                        min(int(abs(delta_y) * current_sensitivity), 32767)
-                    )
-            else:
-                output_magnitude = scaled_input
-
-            if delta_y > 0:
-                mousey = -int(output_magnitude)
-            elif delta_y < 0:
-                mousey = int(output_magnitude)
-            else:
-                mousey = 0
-
-            clamped_mousey = max(-32768, min(32767, mousey))
-
-            print("Joystick y:", clamped_mousey)
-
-            gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
-            gamepad.update()
-
-            elapsed = time.perf_counter() - cycle_start
-
-            sleep_time = max(0, (1 / pollRate) - elapsed)
-            time.sleep(sleep_time)
+                time.sleep(0.001)  # Yield CPU
 
 
 class MainWindow(QWidget):
