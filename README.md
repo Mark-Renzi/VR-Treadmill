@@ -3,6 +3,7 @@ Script that converts mouse movement into joystick movement for a VR treadmill.
 
 This version adds some more features, including:
 - Raw mouse input to avoid locking the mouse or hitting the edge of the screen
+- Various input smoothing methods
 - Sensitivity remapping and visualization
 - Config saving and loading
 
@@ -62,4 +63,6 @@ python -m vr_treadmill
 > [!WARNING]
 > In theory you could run this script without installing as a package but I don't plan to support this so if it doesn't work when you run the main file directly don't complain, just read the readme.
 
-While running, you can press the recenter toggle key to free your mouse for setting up controls. (Default is F9)
+Raw input mode is highly recommended, but I've only built this feature for windows so far.
+
+While running in non-raw input mode, you can press the recenter toggle key to free your mouse for setting up controls. (Default is F9)
