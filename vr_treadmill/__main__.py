@@ -6,6 +6,7 @@ import time
 from pynput.keyboard import Key, Listener
 from pynput.mouse import Controller
 from PyQt6 import QtCore
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QWidget,
@@ -173,6 +174,7 @@ class MainWindow(QWidget):
         self.raw_listener.delta_signal.connect(self.update_mouse_delta)
 
         self.setWindowTitle("Maratron")
+        self.setWindowIcon(QIcon("./resources/mini.ico"))
 
         self.startStopButton = QPushButton("Start")
         self.startStopButton.clicked.connect(self.toggleTracking)

@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt6.QtGui import QPainter, QPen, QColor, QMouseEvent
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QPainter, QPen, QColor, QMouseEvent, QIcon
 from PyQt6.QtCore import Qt, QPointF
 
 
@@ -7,6 +7,7 @@ class CurveEditorWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Sensitivity Curve Editor")
+        self.setWindowIcon(QIcon("./resources/curve.ico"))
         self.setMinimumSize(500, 550)
 
         self.curve_mapping = []
