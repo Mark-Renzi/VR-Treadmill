@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QInputDialog,
 )
+from threading import Lock
 import vgamepad as vg
 from vr_treadmill.curve_editor import CurveEditorWindow
 from vr_treadmill.raw_mouse_listener import RawMouseListener
@@ -31,6 +32,7 @@ enabled = False
 
 useRawInput = True
 mouseDeltaY = 0
+mouseDeltaLock = Lock()
 
 keyToggle = False
 
@@ -82,7 +84,8 @@ class JoystickWorker(QtCore.QThread):
             useRawInput, \
             mouseDeltaY, \
             averageCount, \
-            smoothingType
+            smoothingType, \
+            mouseDeltaLock
 
         next_time = time.perf_counter()
 
@@ -93,8 +96,10 @@ class JoystickWorker(QtCore.QThread):
                 current_sensitivity = sensitivity
 
                 if useRawInput:
-                    delta_y_current = mouseDeltaY
-                    mouseDeltaY = 0
+                    # Thread-safe read and reset of shared delta
+                    with mouseDeltaLock:
+                        delta_y_current = mouseDeltaY
+                        mouseDeltaY = 0
                 else:
                     delta_y_current = mouse.position[1] - 500
                     if recenterEnabled:
@@ -288,7 +293,8 @@ class MainWindow(QWidget):
     def update_mouse_delta(self, dx, dy):
         """Accumulate mouse deltas from the RawMouseListener thread."""
         global mouseDeltaY
-        mouseDeltaY += dy
+        with mouseDeltaLock:
+            mouseDeltaY += dy
 
     def update_curve_input(self, input_value: int):
         if (
