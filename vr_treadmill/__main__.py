@@ -373,7 +373,7 @@ class MainWindow(QWidget):
             print("Smoothing type set to: Median")
         elif type_id == SMOOTHING_TYPE_MAX and self.maxRadio.isChecked():
             smoothingType = SMOOTHING_TYPE_MAX
-            print("Smoothing type set to: Max (Absolute)")
+            print("Smoothing type set to: Peak")
 
     def setAKey(self):
         global aKey
