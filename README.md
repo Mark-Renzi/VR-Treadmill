@@ -15,7 +15,7 @@ This version adds some more features, including:
 You can install with pip or uv. If you're going to develop, use uv, but it's not required.
 
 ### uv
-I recommend [astral's uv](https://docs.astral.sh/uv/getting-started/installation/), a fast package manager that can be used as a compatible drop-in for pip. It can take full advantage of the pyproject file for developers.
+I recommend [astral's uv](https://docs.astral.sh/uv/getting-started/installation/), a fast package manager that can be used as a compatible drop-in replacement for pip. It can take full advantage of the pyproject file for developers.
 
 ```shell
 uv venv --python 3.13
