@@ -335,7 +335,7 @@ class MainWindow(QWidget):
     def setSensitivity(self, value):
         global sensitivity
         try:
-            val = int(value)
+            val = float(value)
             if val <= 0:
                 raise ValueError
             sensitivity = val
