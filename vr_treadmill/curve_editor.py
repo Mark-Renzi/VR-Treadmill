@@ -133,6 +133,9 @@ class CurveEditorWindow(QWidget):
         self.dragging_point_index = None
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+
         pos = event.position()
 
         for i in range(len(self.points) - 1):
