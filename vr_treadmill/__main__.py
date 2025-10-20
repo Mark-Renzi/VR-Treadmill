@@ -35,6 +35,8 @@ mouse = Controller()
 enabled = False
 
 useRawInput = True
+holdLeftThumbstick = False
+
 mouseDeltaY = 0
 mouseDeltaLock = Lock()
 
@@ -153,6 +155,12 @@ class JoystickWorker(QtCore.QThread):
                 )
                 clamped_mousey = max(-32768, min(32767, mousey))
 
+                if holdLeftThumbstick:
+                    if clamped_mousey != 0:
+                        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB)
+                    else:
+                        gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB)
+
                 gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
                 gamepad.update()
 
@@ -207,7 +215,12 @@ class MainWindow(QWidget):
         self.rawInputCheckbox.setChecked(useRawInput)
         self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
 
+        self.holdLThumbCheckbox = QCheckBox("Hold Left Thumbstick")
+        self.holdLThumbCheckbox.setChecked(holdLeftThumbstick)
+        self.holdLThumbCheckbox.stateChanged.connect(self.toggleHoldThumbstick)
+
         inputLayout.addRow(self.rawInputCheckbox)
+        inputLayout.addRow(self.holdLThumbCheckbox)
         inputLayout.addRow("Sensitivity:", self.senseLine)
         inputLayout.addRow("Polling Rate (/sec):", self.pollRateLine)
 
@@ -373,6 +386,11 @@ class MainWindow(QWidget):
         self.startStopButton.setEnabled(
             self.validSensitivity and self.validPollRate and self.validAverageCount
         )
+    
+    def toggleHoldThumbstick(self, state):
+        global holdLeftThumbstick
+        holdLeftThumbstick = state == 2
+        print(f"Hold Left Thumbstick: {'enabled' if holdLeftThumbstick else 'disabled'}")
 
     def setPollingRate(self, value):
         global pollRate
