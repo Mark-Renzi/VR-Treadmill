@@ -203,21 +203,28 @@ class MainWindow(QWidget):
         self.pollRateLine = QLineEdit(str(pollRate))
         self.pollRateLine.textChanged.connect(self.setPollingRate)
 
-        self.avgLine = QLineEdit(str(averageCount))
-        self.avgLine.textChanged.connect(self.setAverageCount)
-
         self.rawInputCheckbox = QCheckBox("Use Raw Input (Windows)")
         self.rawInputCheckbox.setChecked(useRawInput)
         self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
 
         inputLayout.addRow("Sensitivity:", self.senseLine)
         inputLayout.addRow("Polling Rate (/sec):", self.pollRateLine)
-        inputLayout.addRow("Smoothing Window:", self.avgLine)
-        inputLayout.addRow("", self.rawInputCheckbox)
+
         inputGroup.setLayout(inputLayout)
 
         # Group: Smoothing Options
-        smoothingGroup = QGroupBox("Smoothing Type")
+        smoothingGroup = QGroupBox("Smoothing Options")
+        smoothingMainLayout = QVBoxLayout()
+
+        # Top row: label + text input for smoothing window
+        smoothingWindowLayout = QHBoxLayout()
+        smoothingLabel = QLabel("Smoothing Window:")
+        self.avgLine = QLineEdit(str(averageCount))
+        self.avgLine.textChanged.connect(self.setAverageCount)
+        smoothingWindowLayout.addWidget(smoothingLabel)
+        smoothingWindowLayout.addWidget(self.avgLine)
+
+        # Bottom row: radio buttons side-by-side
         smoothingLayout = QHBoxLayout()
         self.meanRadio = QRadioButton("Mean")
         self.medianRadio = QRadioButton("Median")
@@ -225,7 +232,11 @@ class MainWindow(QWidget):
         smoothingLayout.addWidget(self.meanRadio)
         smoothingLayout.addWidget(self.medianRadio)
         smoothingLayout.addWidget(self.maxRadio)
-        smoothingGroup.setLayout(smoothingLayout)
+
+        # Combine both layouts
+        smoothingMainLayout.addLayout(smoothingWindowLayout)
+        smoothingMainLayout.addLayout(smoothingLayout)
+        smoothingGroup.setLayout(smoothingMainLayout)
 
         # RadioButton initial state
         if smoothingType == SMOOTHING_TYPE_MEAN:
