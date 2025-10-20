@@ -156,8 +156,6 @@ class JoystickWorker(QtCore.QThread):
                 gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
                 gamepad.update()
 
-                print("Joystick y:", clamped_mousey)
-
                 self.update_input_display.emit(clamped_mousey)
 
                 # Schedule next run
