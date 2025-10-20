@@ -20,11 +20,14 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QComboBox,
     QInputDialog,
+    QFormLayout,
 )
 from threading import Lock
 import vgamepad as vg
 from vr_treadmill.curve_editor import CurveEditorWindow
 from vr_treadmill.raw_mouse_listener import RawMouseListener
+from vr_treadmill.ui_resources.stylesheets import get_common_stylesheet
+from vr_treadmill.ui_resources.joystick_bar import JoystickBar
 import statistics
 
 gamepad = vg.VX360Gamepad()
@@ -44,10 +47,11 @@ recenterEnabled = False
 recenterToggleKey = Key.f9
 recenterKeyToggle = False
 
+quitKey = Key.ctrl_r
+
 # -------------------------------------------------------------------
 sensitivity = 100  # How sensitive the joystick will be
-pollRate = 60  # How many times per second the mouse will be checked
-quitKey = Key.ctrl_r  # Which key will stop the program
+pollRate = 60  # Times per second to update gamepad (and check mouse in non-raw)
 averageCount = 5  # Number of data points in the smoothing window.
 # -------------------------------------------------------------------
 
@@ -61,7 +65,8 @@ os.makedirs(CONFIG_DIR, exist_ok=True)
 
 
 class JoystickWorker(QtCore.QThread):
-    update_input = QtCore.pyqtSignal(int)
+    update_graph_input_display = QtCore.pyqtSignal(int)
+    update_input_display = QtCore.pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -133,7 +138,7 @@ class JoystickWorker(QtCore.QThread):
                     output_magnitude = window.interpolate_curve(scaled_input, curve_lut)
 
                     if window.showDotCheckbox.isChecked():
-                        self.update_input.emit(
+                        self.update_graph_input_display.emit(
                             min(int(abs(delta_y) * current_sensitivity), 32767)
                         )
                 else:
@@ -148,10 +153,10 @@ class JoystickWorker(QtCore.QThread):
                 )
                 clamped_mousey = max(-32768, min(32767, mousey))
 
-                print("Joystick y:", clamped_mousey)
-
                 gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
                 gamepad.update()
+
+                self.update_input_display.emit(clamped_mousey)
 
                 # Schedule next run
                 next_time += 1.0 / pollRate
@@ -167,8 +172,9 @@ class MainWindow(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # Thread + Mouse
         self.worker = JoystickWorker()
-        self.worker.update_input.connect(self.update_curve_input)
+        self.worker.update_graph_input_display.connect(self.update_curve_input)
 
         self.raw_listener = RawMouseListener()
         self.raw_listener.delta_signal.connect(self.update_mouse_delta)
@@ -176,52 +182,52 @@ class MainWindow(QWidget):
         self.setWindowTitle("Maratron")
         self.setWindowIcon(QIcon("./resources/mini.ico"))
 
+        # Group: Tracking Controls
+        trackingGroup = QGroupBox("Tracking")
+        trackingLayout = QVBoxLayout()
+        self.joystickBar = JoystickBar()
+        trackingLayout.addWidget(self.joystickBar)
+        self.worker.update_input_display.connect(self.update_joystick_bar)
+
         self.startStopButton = QPushButton("Start")
         self.startStopButton.clicked.connect(self.toggleTracking)
+        trackingLayout.addWidget(self.startStopButton)
+        trackingGroup.setLayout(trackingLayout)
 
-        self.setKeyButton = QPushButton("Set Stop Key")
-        self.setKeyButton.clicked.connect(self.setKey)
-
-        self.setAKeyButton = QPushButton("Set A Button Key")
-        self.setAKeyButton.clicked.connect(self.setAKey)
-
-        self.aKeyLabel = QLabel(f"A Button Key: {aKey}")
-
-        self.setRecenterKeyButton = QPushButton("Set Recenter Toggle Key")
-        self.setRecenterKeyButton.clicked.connect(self.setRecenterKey)
-
-        self.recenterKeyLabel = QLabel(f"Recenter disabled (Raw Input ON)")
-
-        pollLabel = QLabel("Polling Rate (/sec):")
-        senseLabel = QLabel("Sensitivity:")
-        avgLabel = QLabel("Data Points in Smoothing Window (1 = Off):")
-        self.keyLabel = QLabel(f"Stop Key: {quitKey}")
+        # Group: Input Settings
+        inputGroup = QGroupBox("Input Settings")
+        inputLayout = QFormLayout()
+        self.senseLine = QLineEdit(str(sensitivity))
+        self.senseLine.textChanged.connect(self.setSensitivity)
 
         self.pollRateLine = QLineEdit(str(pollRate))
         self.pollRateLine.textChanged.connect(self.setPollingRate)
 
-        self.senseLine = QLineEdit(str(sensitivity))
-        self.senseLine.textChanged.connect(self.setSensitivity)
-
         self.avgLine = QLineEdit(str(averageCount))
         self.avgLine.textChanged.connect(self.setAverageCount)
 
-        self.openCurveEditorButton = QPushButton("Edit Sensitivity Curve")
-        self.openCurveEditorButton.clicked.connect(self.openCurveEditor)
-
-        self.showDotCheckbox = QCheckBox("Show Input on Curve")
-
         self.rawInputCheckbox = QCheckBox("Use Raw Input (Windows)")
-        self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
         self.rawInputCheckbox.setChecked(useRawInput)
+        self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
 
-        self.setRecenterKeyButton.setEnabled(not useRawInput)
+        inputLayout.addRow("Sensitivity:", self.senseLine)
+        inputLayout.addRow("Polling Rate (/sec):", self.pollRateLine)
+        inputLayout.addRow("Smoothing Window:", self.avgLine)
+        inputLayout.addRow("", self.rawInputCheckbox)
+        inputGroup.setLayout(inputLayout)
 
-        self.smoothingGroup = QGroupBox("Smoothing Type")
+        # Group: Smoothing Options
+        smoothingGroup = QGroupBox("Smoothing Type")
+        smoothingLayout = QHBoxLayout()
         self.meanRadio = QRadioButton("Mean")
         self.medianRadio = QRadioButton("Median")
         self.maxRadio = QRadioButton("Peak")
+        smoothingLayout.addWidget(self.meanRadio)
+        smoothingLayout.addWidget(self.medianRadio)
+        smoothingLayout.addWidget(self.maxRadio)
+        smoothingGroup.setLayout(smoothingLayout)
 
+        # RadioButton initial state
         if smoothingType == SMOOTHING_TYPE_MEAN:
             self.meanRadio.setChecked(True)
         elif smoothingType == SMOOTHING_TYPE_MEDIAN:
@@ -229,6 +235,7 @@ class MainWindow(QWidget):
         elif smoothingType == SMOOTHING_TYPE_MAX:
             self.maxRadio.setChecked(True)
 
+        # Connections
         self.meanRadio.toggled.connect(
             lambda: self.setSmoothingType(SMOOTHING_TYPE_MEAN)
         )
@@ -237,12 +244,41 @@ class MainWindow(QWidget):
         )
         self.maxRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MAX))
 
-        h_layout = QHBoxLayout()
-        h_layout.addWidget(self.meanRadio)
-        h_layout.addWidget(self.medianRadio)
-        h_layout.addWidget(self.maxRadio)
-        self.smoothingGroup.setLayout(h_layout)
+        # Group: Key Binds
+        keybindGroup = QGroupBox("Key Binds")
+        keybindLayout = QVBoxLayout()
+        self.setKeyButton = QPushButton("Set Stop Key")
+        self.setAKeyButton = QPushButton("Set A Button Key")
+        self.setRecenterKeyButton = QPushButton("Set Recenter Toggle Key")
+        self.keyLabel = QLabel(f"Stop Key: {quitKey}")
+        self.aKeyLabel = QLabel(f"A Button Key: {aKey}")
+        self.recenterKeyLabel = QLabel("Recenter disabled (Raw Input ON)")
 
+        self.setKeyButton.clicked.connect(self.setKey)
+        self.setAKeyButton.clicked.connect(self.setAKey)
+        self.setRecenterKeyButton.clicked.connect(self.setRecenterKey)
+
+        keybindLayout.addWidget(self.keyLabel)
+        keybindLayout.addWidget(self.setKeyButton)
+        keybindLayout.addWidget(self.aKeyLabel)
+        keybindLayout.addWidget(self.setAKeyButton)
+        keybindLayout.addWidget(self.recenterKeyLabel)
+        keybindLayout.addWidget(self.setRecenterKeyButton)
+        keybindGroup.setLayout(keybindLayout)
+
+        # Group: Curve Editor
+        curveGroup = QGroupBox("Curve Editor")
+        curveLayout = QVBoxLayout()
+        self.openCurveEditorButton = QPushButton("Edit Sensitivity Curve")
+        self.showDotCheckbox = QCheckBox("Show Input on Curve")
+        curveLayout.addWidget(self.openCurveEditorButton)
+        curveLayout.addWidget(self.showDotCheckbox)
+        self.openCurveEditorButton.clicked.connect(self.openCurveEditor)
+        curveGroup.setLayout(curveLayout)
+
+        # Group: Config Management
+        configGroup = QGroupBox("Configuration")
+        configLayout = QVBoxLayout()
         self.configDropdown = QComboBox()
         self.loadConfigButton = QPushButton("Load Config")
         self.saveConfigButton = QPushButton("Save Config")
@@ -250,32 +286,26 @@ class MainWindow(QWidget):
         self.loadConfigButton.clicked.connect(self.load_config)
         self.saveConfigButton.clicked.connect(lambda: self.save_config())
 
+        configLayout.addWidget(self.configDropdown)
+        configLayout.addWidget(self.loadConfigButton)
+        configLayout.addWidget(self.saveConfigButton)
+        configGroup.setLayout(configLayout)
+
         self.update_config_dropdown()
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.startStopButton)
-        layout.addWidget(senseLabel)
-        layout.addWidget(self.senseLine)
-        layout.addWidget(pollLabel)
-        layout.addWidget(self.pollRateLine)
-        layout.addWidget(avgLabel)
-        layout.addWidget(self.avgLine)
-        layout.addWidget(self.smoothingGroup)
-        layout.addWidget(self.keyLabel)
-        layout.addWidget(self.setKeyButton)
-        layout.addWidget(self.aKeyLabel)
-        layout.addWidget(self.setAKeyButton)
-        layout.addWidget(self.recenterKeyLabel)
-        layout.addWidget(self.setRecenterKeyButton)
-        layout.addWidget(self.rawInputCheckbox)
-        layout.addWidget(self.openCurveEditorButton)
-        layout.addWidget(self.showDotCheckbox)
-        layout.addWidget(QLabel("Config:"))
-        layout.addWidget(self.configDropdown)
-        layout.addWidget(self.loadConfigButton)
-        layout.addWidget(self.saveConfigButton)
+        # Main Layout
+        mainLayout = QVBoxLayout()
+        mainLayout.addWidget(trackingGroup)
+        mainLayout.addWidget(inputGroup)
+        mainLayout.addWidget(smoothingGroup)
+        mainLayout.addWidget(keybindGroup)
+        mainLayout.addWidget(curveGroup)
+        mainLayout.addWidget(configGroup)
 
-        self.setLayout(layout)
+        self.setLayout(mainLayout)
+
+        self.setStyleSheet(get_common_stylesheet())
+
         self.show()
 
         self.validSensitivity = True
@@ -292,7 +322,6 @@ class MainWindow(QWidget):
             except Exception as e:
                 print(f"Failed to load last run config: {e}")
 
-
     def toggleRawInput(self, state):
         global useRawInput, recenterEnabled
         useRawInput = state == 2
@@ -307,6 +336,8 @@ class MainWindow(QWidget):
             self.setRecenterKeyButton.setEnabled(True)
             self.recenterKeyLabel.setText(f"Recenter Toggle Key: {recenterToggleKey}")
             print("Raw Input OFF.")
+            recenterEnabled = not recenterEnabled
+            print(f"Mouse recentering {'enabled' if recenterEnabled else 'disabled'}")
 
     @QtCore.pyqtSlot(int, int)
     def update_mouse_delta(self, dx, dy):
@@ -322,6 +353,9 @@ class MainWindow(QWidget):
             and self.showDotCheckbox.isChecked()
         ):
             self.curveWindow.set_current_input(input_value)
+
+    def update_joystick_bar(self, input_value: int):
+        self.joystickBar.set_value(input_value)
 
     def updateStartButton(self):
         self.startStopButton.setEnabled(
@@ -429,6 +463,14 @@ class MainWindow(QWidget):
             self.worker.stop_loop()
 
             mouseDeltaY = 0
+
+            if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
+                window.curveWindow.clear_current_input()
+
+            self.update_joystick_bar(0)
+
+            gamepad.left_joystick(x_value=0, y_value=0)
+            gamepad.update()
 
             print("Tracking stopped via GUI button.")
         else:
@@ -609,6 +651,11 @@ def onPress(key):
 
             if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
                 window.curveWindow.clear_current_input()
+
+            window.update_joystick_bar(0)
+
+            gamepad.left_joystick(x_value=0, y_value=0)
+            gamepad.update()
 
             window.updateStartStopButtonText()
 

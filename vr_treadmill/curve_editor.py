@@ -1,3 +1,4 @@
+from typing import override
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QPen, QColor, QMouseEvent, QIcon
 from PyQt6.QtCore import Qt, QPointF
@@ -44,30 +45,31 @@ class CurveEditorWindow(QWidget):
             except Exception as e:
                 print(f"Failed to load curve points: {e}")
 
-    def paintEvent(self, event):
+    @override
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         graph_rect = self.rect().adjusted(0, 0, 0, 0)
-        painter.fillRect(graph_rect, Qt.GlobalColor.white)
+        painter.fillRect(graph_rect, self.palette().window())
 
-        painter.setPen(QPen(Qt.GlobalColor.black, 2))
+        painter.setPen(QPen(self.palette().text().color(), 2))
         painter.drawRect(self.margin, self.margin, self.graph_width, self.graph_height)
 
         # Draw curve lines
-        painter.setPen(QPen(Qt.GlobalColor.blue, 2))
+        painter.setPen(QPen(self.palette().text().color(), 2))
         for i in range(len(self.points) - 1):
             p1 = self.points[i]
             p2 = self.points[i + 1]
             painter.drawLine(p1, p2)
 
         # Draw control points
-        painter.setPen(QPen(Qt.GlobalColor.red, 2))
-        painter.setBrush(QColor("red"))
+        painter.setPen(QPen(self.palette().text().color(), 2))
+        painter.setBrush(self.palette().highlight().color())
         for p in self.points:
             painter.drawEllipse(p, self.point_radius, self.point_radius)
 
-        painter.setPen(QPen(Qt.GlobalColor.black))
+        painter.setPen(QPen(self.palette().text().color()))
         painter.drawText(
             self.margin,
             self.margin + self.graph_height + 30,
@@ -87,68 +89,75 @@ class CurveEditorWindow(QWidget):
 
             if y is not None:
                 painter.setBrush(QColor("green"))
-                painter.setPen(QPen(Qt.GlobalColor.black))
+                painter.setPen(QPen(self.palette().text().color()))
                 painter.drawEllipse(QPointF(x, y), self.point_radius, self.point_radius)
 
     def clear_current_input(self):
         self.current_input = None
         self.update()
 
-    def mousePressEvent(self, event: QMouseEvent):
-        pos = event.position()
-        for i, point in enumerate(self.points):
-            if (point - pos).manhattanLength() < self.point_radius * 2:
-                if event.button() == Qt.MouseButton.RightButton:
-                    # Prevent deleting endpoints
-                    if i != 0 and i != len(self.points) - 1:
-                        del self.points[i]
-                        self.dirty = True
-                        self.update()
-                    return
-                elif event.button() == Qt.MouseButton.LeftButton:
-                    self.dragging_point_index = i
-                    return
+    @override
+    def mousePressEvent(self, a0: QMouseEvent | None):
+        if a0 is not None:
+            pos = a0.position()
+            for i, point in enumerate(self.points):
+                if (point - pos).manhattanLength() < self.point_radius * 2:
+                    if a0.button() == Qt.MouseButton.RightButton:
+                        # Prevent deleting endpoints
+                        if i != 0 and i != len(self.points) - 1:
+                            del self.points[i]
+                            self.dirty = True
+                            self.update()
+                        return
+                    elif a0.button() == Qt.MouseButton.LeftButton:
+                        self.dragging_point_index = i
+                        return
 
-    def mouseMoveEvent(self, event: QMouseEvent):
-        if self.dragging_point_index is not None:
-            pos = event.position()
-            # Lock X position for endpoints
-            if self.dragging_point_index == 0:
-                x = self.margin
-            elif self.dragging_point_index == len(self.points) - 1:
-                x = self.margin + self.graph_width
-            else:
-                # Clamp x between neighbors
-                left_x = self.points[self.dragging_point_index - 1].x()
-                right_x = self.points[self.dragging_point_index + 1].x()
-                x = min(max(pos.x(), left_x + 1), right_x - 1)
+    @override
+    def mouseMoveEvent(self, a0: QMouseEvent | None):
+        if a0 is not None:
+            if self.dragging_point_index is not None:
+                pos = a0.position()
+                # Lock X position for endpoints
+                if self.dragging_point_index == 0:
+                    x = self.margin
+                elif self.dragging_point_index == len(self.points) - 1:
+                    x = self.margin + self.graph_width
+                else:
+                    # Clamp x between neighbors
+                    left_x = self.points[self.dragging_point_index - 1].x()
+                    right_x = self.points[self.dragging_point_index + 1].x()
+                    x = min(max(pos.x(), left_x + 1), right_x - 1)
 
-            # Clamp y within graph
-            y = min(max(pos.y(), self.margin), self.margin + self.graph_height)
-            self.points[self.dragging_point_index] = QPointF(x, y)
-            self.dirty = True
-            self.update()
-
-    def mouseReleaseEvent(self, event: QMouseEvent):
-        self.dragging_point_index = None
-
-    def mouseDoubleClickEvent(self, event: QMouseEvent):
-        if event.button() != Qt.MouseButton.LeftButton:
-            return
-
-        pos = event.position()
-
-        for i in range(len(self.points) - 1):
-            a = self.points[i]
-            b = self.points[i + 1]
-            if self.is_point_near_line(pos, a, b):
-                new_x = min(max(pos.x(), a.x() + 1), b.x() - 1)
-                ratio = (new_x - a.x()) / (b.x() - a.x())
-                new_y = a.y() + ratio * (b.y() - a.y())
-                self.points.insert(i + 1, QPointF(new_x, new_y))
+                # Clamp y within graph
+                y = min(max(pos.y(), self.margin), self.margin + self.graph_height)
+                self.points[self.dragging_point_index] = QPointF(x, y)
                 self.dirty = True
                 self.update()
-                break
+
+    @override
+    def mouseReleaseEvent(self, a0: QMouseEvent | None):
+        self.dragging_point_index = None
+
+    @override
+    def mouseDoubleClickEvent(self, a0: QMouseEvent | None):
+        if a0 is not None:
+            if a0.button() != Qt.MouseButton.LeftButton:
+                return
+
+            pos = a0.position()
+
+            for i in range(len(self.points) - 1):
+                a = self.points[i]
+                b = self.points[i + 1]
+                if self.is_point_near_line(pos, a, b):
+                    new_x = min(max(pos.x(), a.x() + 1), b.x() - 1)
+                    ratio = (new_x - a.x()) / (b.x() - a.x())
+                    new_y = a.y() + ratio * (b.y() - a.y())
+                    self.points.insert(i + 1, QPointF(new_x, new_y))
+                    self.dirty = True
+                    self.update()
+                    break
 
     def get_or_build_curve_mapping(self):
         if self.dirty:
