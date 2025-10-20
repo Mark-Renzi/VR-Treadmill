@@ -192,30 +192,38 @@ class MainWindow(QWidget):
 
         # Group: Tracking Controls
         trackingGroup = QGroupBox("Tracking")
+        trackingGroup.setToolTip("Control whether mouse tracking is currently active.")
         trackingLayout = QVBoxLayout()
         self.joystickBar = JoystickBar()
+        self.joystickBar.setToolTip("Displays the current Y-axis joystick value being sent to the virtual gamepad.")
         trackingLayout.addWidget(self.joystickBar)
         self.worker.update_input_display.connect(self.update_joystick_bar)
 
         self.startStopButton = QPushButton("Start")
+        self.startStopButton.setToolTip("Start or stop tracking mouse input and sending it to the virtual joystick.")
         self.startStopButton.clicked.connect(self.toggleTracking)
         trackingLayout.addWidget(self.startStopButton)
         trackingGroup.setLayout(trackingLayout)
 
         # Group: Input Settings
         inputGroup = QGroupBox("Input Settings")
+        inputGroup.setToolTip("Configure how input is captured and how frequently it's processed.")
         inputLayout = QFormLayout()
         self.senseLine = QLineEdit(str(sensitivity))
+        self.senseLine.setToolTip("Adjust the sensitivity multiplier for mouse movement to joystick input.")
         self.senseLine.textChanged.connect(self.setSensitivity)
 
         self.pollRateLine = QLineEdit(str(pollRate))
+        self.pollRateLine.setToolTip("Set how many times per second input is processed and joystick is updated.")
         self.pollRateLine.textChanged.connect(self.setPollingRate)
 
         self.rawInputCheckbox = QCheckBox("Use Raw Input (Windows)")
+        self.rawInputCheckbox.setToolTip("Enable low-level raw mouse input for better precision. Only works on Windows.")
         self.rawInputCheckbox.setChecked(useRawInput)
         self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
 
         self.holdLThumbCheckbox = QCheckBox("Hold Left Thumbstick")
+        self.holdLThumbCheckbox.setToolTip("When enabled, the Left Thumbstick button is held while there's movement input.")
         self.holdLThumbCheckbox.setChecked(holdLeftThumbstick)
         self.holdLThumbCheckbox.stateChanged.connect(self.toggleHoldThumbstick)
 
@@ -228,12 +236,15 @@ class MainWindow(QWidget):
 
         # Group: Smoothing Options
         smoothingGroup = QGroupBox("Smoothing Options")
+        smoothingGroup.setToolTip("Apply smoothing to reduce input jitter or noise using different techniques.")
         smoothingMainLayout = QVBoxLayout()
 
         # Top row: label + text input for smoothing window
         smoothingWindowLayout = QHBoxLayout()
         smoothingLabel = QLabel("Smoothing Window:")
+        smoothingLabel.setToolTip("Number of recent input samples used to compute smoothed output.")
         self.avgLine = QLineEdit(str(averageCount))
+        self.avgLine.setToolTip("How many mouse input values to use to calculate joystick output.")
         self.avgLine.textChanged.connect(self.setAverageCount)
         smoothingWindowLayout.addWidget(smoothingLabel)
         smoothingWindowLayout.addWidget(self.avgLine)
@@ -241,43 +252,40 @@ class MainWindow(QWidget):
         # Bottom row: radio buttons side-by-side
         smoothingLayout = QHBoxLayout()
         self.meanRadio = QRadioButton("Mean")
+        self.meanRadio.setToolTip("Average the last N inputs (best for general smoothing).")
         self.medianRadio = QRadioButton("Median")
+        self.medianRadio.setToolTip("Use the median of the last N inputs (more resistant to spikes).")
         self.maxRadio = QRadioButton("Peak")
+        self.maxRadio.setToolTip(
+            "Use the peak (highest absolute value) from recent inputs "
+            "(more responsive when mice lose tracking at high speeds)."
+        )
+
         smoothingLayout.addWidget(self.meanRadio)
         smoothingLayout.addWidget(self.medianRadio)
         smoothingLayout.addWidget(self.maxRadio)
 
-        # Combine both layouts
         smoothingMainLayout.addLayout(smoothingWindowLayout)
         smoothingMainLayout.addLayout(smoothingLayout)
         smoothingGroup.setLayout(smoothingMainLayout)
 
-        # RadioButton initial state
-        if smoothingType == SMOOTHING_TYPE_MEAN:
-            self.meanRadio.setChecked(True)
-        elif smoothingType == SMOOTHING_TYPE_MEDIAN:
-            self.medianRadio.setChecked(True)
-        elif smoothingType == SMOOTHING_TYPE_MAX:
-            self.maxRadio.setChecked(True)
-
-        # Connections
-        self.meanRadio.toggled.connect(
-            lambda: self.setSmoothingType(SMOOTHING_TYPE_MEAN)
-        )
-        self.medianRadio.toggled.connect(
-            lambda: self.setSmoothingType(SMOOTHING_TYPE_MEDIAN)
-        )
-        self.maxRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MAX))
-
         # Group: Key Binds
         keybindGroup = QGroupBox("Key Binds")
+        keybindGroup.setToolTip("Set which keys control stopping the app, pressing A, or toggling recenter.")
         keybindLayout = QVBoxLayout()
         self.setKeyButton = QPushButton("Set Stop Key")
+        self.setKeyButton.setToolTip("Click to change the key used to stop tracking manually.")
         self.setAKeyButton = QPushButton("Set A Button Key")
+        self.setAKeyButton.setToolTip("Click to assign a keyboard key to simulate pressing the A button.")
         self.setRecenterKeyButton = QPushButton("Set Recenter Toggle Key")
+        self.setRecenterKeyButton.setToolTip("Click to set the key that toggles automatic mouse recentering (only in non-raw mode).")
+
         self.keyLabel = QLabel(f"Stop Key: {quitKey}")
+        self.keyLabel.setToolTip("Currently assigned Stop Key.")
         self.aKeyLabel = QLabel(f"A Button Key: {aKey}")
+        self.aKeyLabel.setToolTip("Currently assigned A Button Key.")
         self.recenterKeyLabel = QLabel("Recenter disabled (Raw Input ON)")
+        self.recenterKeyLabel.setToolTip("Shows the current state and key for mouse recentering.")
 
         self.setKeyButton.clicked.connect(self.setKey)
         self.setAKeyButton.clicked.connect(self.setAKey)
@@ -293,9 +301,13 @@ class MainWindow(QWidget):
 
         # Group: Curve Editor
         curveGroup = QGroupBox("Curve Editor")
+        curveGroup.setToolTip("Fine-tune how sensitivity scales with movement using a custom curve.")
         curveLayout = QVBoxLayout()
         self.openCurveEditorButton = QPushButton("Edit Sensitivity Curve")
+        self.openCurveEditorButton.setToolTip("Open the sensitivity curve editor window to customize response curve.")
         self.showDotCheckbox = QCheckBox("Show Input on Curve")
+        self.showDotCheckbox.setToolTip("Visually display input and output on the sensitivity curve graph in real-time.")
+
         curveLayout.addWidget(self.openCurveEditorButton)
         curveLayout.addWidget(self.showDotCheckbox)
         self.openCurveEditorButton.clicked.connect(self.openCurveEditor)
@@ -303,10 +315,14 @@ class MainWindow(QWidget):
 
         # Group: Config Management
         configGroup = QGroupBox("Configuration")
+        configGroup.setToolTip("Save and load user configurations for reuse.")
         configLayout = QVBoxLayout()
         self.configDropdown = QComboBox()
+        self.configDropdown.setToolTip("Select from saved configurations.")
         self.loadConfigButton = QPushButton("Load Config")
+        self.loadConfigButton.setToolTip("Load the selected configuration.")
         self.saveConfigButton = QPushButton("Save Config")
+        self.saveConfigButton.setToolTip("Save the current settings under a custom name.")
 
         self.loadConfigButton.clicked.connect(self.load_config)
         self.saveConfigButton.clicked.connect(lambda: self.save_config())
