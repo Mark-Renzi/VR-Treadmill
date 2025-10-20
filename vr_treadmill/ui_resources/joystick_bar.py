@@ -28,12 +28,12 @@ class JoystickBar(QWidget):
         normalized = self.value / 32768
 
         if normalized > 0:
-            bar_width = int((center -1) * normalized)
+            bar_width = int((center - 1) * normalized)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QBrush(QColor(0, 180, 0)))
             painter.drawRect(center, 2, bar_width, height - 4)
         elif normalized < 0:
-            bar_width = int((center -1) * abs(normalized))
+            bar_width = int((center - 1) * abs(normalized))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QBrush(QColor(180, 0, 0)))
             painter.drawRect(center - bar_width, 2, bar_width, height - 4)
@@ -43,7 +43,7 @@ class JoystickBar(QWidget):
         frame_pen.setWidth(1)
         painter.setPen(frame_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(1, 1, width-2, height-2, 4, 4)
+        painter.drawRoundedRect(1, 1, width - 2, height - 2, 4, 4)
 
         # Draw center line
         lighter_color = self.palette().text().color()

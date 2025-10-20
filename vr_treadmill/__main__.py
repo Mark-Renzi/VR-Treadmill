@@ -51,7 +51,7 @@ quitKey = Key.ctrl_r
 
 # -------------------------------------------------------------------
 sensitivity = 100  # How sensitive the joystick will be
-pollRate = 60  # How many times per second the mouse will be checked and the joystick updated
+pollRate = 60  # Times per second to update gamepad (and check mouse in non-raw)
 averageCount = 5  # Number of data points in the smoothing window.
 # -------------------------------------------------------------------
 
@@ -236,8 +236,12 @@ class MainWindow(QWidget):
             self.maxRadio.setChecked(True)
 
         # Connections
-        self.meanRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MEAN))
-        self.medianRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MEDIAN))
+        self.meanRadio.toggled.connect(
+            lambda: self.setSmoothingType(SMOOTHING_TYPE_MEAN)
+        )
+        self.medianRadio.toggled.connect(
+            lambda: self.setSmoothingType(SMOOTHING_TYPE_MEDIAN)
+        )
         self.maxRadio.toggled.connect(lambda: self.setSmoothingType(SMOOTHING_TYPE_MAX))
 
         # Group: Key Binds
@@ -302,7 +306,6 @@ class MainWindow(QWidget):
 
         self.setStyleSheet(get_common_stylesheet())
 
-
         self.show()
 
         self.validSensitivity = True
@@ -318,7 +321,6 @@ class MainWindow(QWidget):
                     print("Loaded last run config on startup.")
             except Exception as e:
                 print(f"Failed to load last run config: {e}")
-
 
     def toggleRawInput(self, state):
         global useRawInput, recenterEnabled
@@ -351,7 +353,7 @@ class MainWindow(QWidget):
             and self.showDotCheckbox.isChecked()
         ):
             self.curveWindow.set_current_input(input_value)
-    
+
     def update_joystick_bar(self, input_value: int):
         self.joystickBar.set_value(input_value)
 
