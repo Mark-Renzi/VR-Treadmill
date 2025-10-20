@@ -7,7 +7,7 @@ This version adds some more features, including:
 - Sensitivity remapping and visualization
 - Config saving and loading
 
-<img width="639" height="656" alt="image" src="https://github.com/user-attachments/assets/ed53602b-9599-4e34-9e18-efbb59c4c990" />
+<img width="1501" height="1329" alt="image" src="https://github.com/user-attachments/assets/0099606d-3301-4974-849e-68ac1a17bbf7" />
 
 
 ## Install Process
