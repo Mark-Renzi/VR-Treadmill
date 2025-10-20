@@ -1,5 +1,6 @@
+from typing import override
 from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QPainter, QColor, QBrush, QPen
+from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPaintEvent
 from PyQt6.QtCore import Qt
 
 
@@ -14,7 +15,8 @@ class JoystickBar(QWidget):
         self.value = max(-32768, min(32767, value))  # Clamp
         self.update()
 
-    def paintEvent(self, event):
+    @override
+    def paintEvent(self, a0: QPaintEvent | None):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
