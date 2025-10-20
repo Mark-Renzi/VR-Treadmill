@@ -556,6 +556,7 @@ class MainWindow(QWidget):
             "average_count": self.avgLine.text(),
             "smoothing_type": smoothingType,
             "raw_input": useRawInput,
+            "hold_left_thumbstick": self.holdLThumbCheckbox.isChecked(),
             "stop_key": str(quitKey),
             "a_key": str(aKey),
             "recenter_key": str(recenterToggleKey),
@@ -584,6 +585,8 @@ class MainWindow(QWidget):
             self.maxRadio.setChecked(True)
 
         self.rawInputCheckbox.setChecked(config.get("raw_input", True))
+
+        self.holdLThumbCheckbox.setChecked(config.get("hold_left_thumbstick", False))
 
         # Restore key binds
         quitKey = self._key_from_string(config.get("stop_key", str(Key.ctrl_r)))
