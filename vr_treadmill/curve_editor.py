@@ -53,7 +53,7 @@ class CurveEditorWindow(QWidget):
         graph_rect = self.rect().adjusted(0, 0, 0, 0)
         painter.fillRect(graph_rect, self.palette().window())
 
-        painter.setPen(QPen(self.palette().text().color(), 2))
+        painter.setPen(QPen(self.palette().midlight().color(), 2))
         painter.drawRect(self.margin, self.margin, self.graph_width, self.graph_height)
 
         # Draw curve lines
@@ -64,8 +64,8 @@ class CurveEditorWindow(QWidget):
             painter.drawLine(p1, p2)
 
         # Draw control points
-        painter.setPen(QPen(self.palette().text().color(), 2))
-        painter.setBrush(self.palette().highlight().color())
+        painter.setPen(QPen(self.palette().highlight().color(), 2))
+        painter.setBrush(self.palette().window())
         for p in self.points:
             painter.drawEllipse(p, self.point_radius, self.point_radius)
 
