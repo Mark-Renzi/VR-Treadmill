@@ -49,25 +49,25 @@ class CurveEditorWindow(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         graph_rect = self.rect().adjusted(0, 0, 0, 0)
-        painter.fillRect(graph_rect, Qt.GlobalColor.white)
+        painter.fillRect(graph_rect, self.palette().window())
 
-        painter.setPen(QPen(Qt.GlobalColor.black, 2))
+        painter.setPen(QPen(self.palette().text().color(), 2))
         painter.drawRect(self.margin, self.margin, self.graph_width, self.graph_height)
 
         # Draw curve lines
-        painter.setPen(QPen(Qt.GlobalColor.blue, 2))
+        painter.setPen(QPen(self.palette().text().color(), 2))
         for i in range(len(self.points) - 1):
             p1 = self.points[i]
             p2 = self.points[i + 1]
             painter.drawLine(p1, p2)
 
         # Draw control points
-        painter.setPen(QPen(Qt.GlobalColor.red, 2))
-        painter.setBrush(QColor("red"))
+        painter.setPen(QPen(self.palette().text().color(), 2))
+        painter.setBrush(self.palette().highlight().color())
         for p in self.points:
             painter.drawEllipse(p, self.point_radius, self.point_radius)
 
-        painter.setPen(QPen(Qt.GlobalColor.black))
+        painter.setPen(QPen(self.palette().text().color()))
         painter.drawText(
             self.margin,
             self.margin + self.graph_height + 30,
@@ -87,7 +87,7 @@ class CurveEditorWindow(QWidget):
 
             if y is not None:
                 painter.setBrush(QColor("green"))
-                painter.setPen(QPen(Qt.GlobalColor.black))
+                painter.setPen(QPen(self.palette().text().color()))
                 painter.drawEllipse(QPointF(x, y), self.point_radius, self.point_radius)
 
     def clear_current_input(self):
