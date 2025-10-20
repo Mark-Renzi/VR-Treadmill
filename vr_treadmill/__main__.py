@@ -46,11 +46,11 @@ recenterEnabled = False
 recenterToggleKey = Key.f9
 recenterKeyToggle = False
 
-quitKey = Key.ctrl_r  # Which key will stop the program
+quitKey = Key.ctrl_r
 
 # -------------------------------------------------------------------
 sensitivity = 100  # How sensitive the joystick will be
-pollRate = 60  # How many times per second the mouse will be checked
+pollRate = 60  # How many times per second the mouse will be checked and the joystick updated
 averageCount = 5  # Number of data points in the smoothing window.
 # -------------------------------------------------------------------
 
