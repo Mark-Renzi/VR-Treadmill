@@ -467,6 +467,9 @@ class MainWindow(QWidget):
 
             self.update_joystick_bar(0)
 
+            gamepad.left_joystick(x_value=0, y_value=0)
+            gamepad.update()
+
             print("Tracking stopped via GUI button.")
         else:
             enabled = True
@@ -648,6 +651,9 @@ def onPress(key):
                 window.curveWindow.clear_current_input()
 
             window.update_joystick_bar(0)
+
+            gamepad.left_joystick(x_value=0, y_value=0)
+            gamepad.update()
 
             window.updateStartStopButtonText()
 
