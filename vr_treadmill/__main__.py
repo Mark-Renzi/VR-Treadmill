@@ -207,6 +207,7 @@ class MainWindow(QWidget):
         self.rawInputCheckbox.setChecked(useRawInput)
         self.rawInputCheckbox.stateChanged.connect(self.toggleRawInput)
 
+        inputLayout.addRow(self.rawInputCheckbox)
         inputLayout.addRow("Sensitivity:", self.senseLine)
         inputLayout.addRow("Polling Rate (/sec):", self.pollRateLine)
 
