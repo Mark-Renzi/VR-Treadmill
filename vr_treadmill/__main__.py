@@ -27,6 +27,7 @@ import vgamepad as vg
 from vr_treadmill.curve_editor import CurveEditorWindow
 from vr_treadmill.raw_mouse_listener import RawMouseListener
 from vr_treadmill.ui_resources.stylesheets import get_common_stylesheet
+from vr_treadmill.ui_resources.joystick_bar import JoystickBar
 import statistics
 
 gamepad = vg.VX360Gamepad()
@@ -64,7 +65,8 @@ os.makedirs(CONFIG_DIR, exist_ok=True)
 
 
 class JoystickWorker(QtCore.QThread):
-    update_input = QtCore.pyqtSignal(int)
+    update_graph_input_display = QtCore.pyqtSignal(int)
+    update_input_display = QtCore.pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -136,7 +138,7 @@ class JoystickWorker(QtCore.QThread):
                     output_magnitude = window.interpolate_curve(scaled_input, curve_lut)
 
                     if window.showDotCheckbox.isChecked():
-                        self.update_input.emit(
+                        self.update_graph_input_display.emit(
                             min(int(abs(delta_y) * current_sensitivity), 32767)
                         )
                 else:
@@ -151,10 +153,12 @@ class JoystickWorker(QtCore.QThread):
                 )
                 clamped_mousey = max(-32768, min(32767, mousey))
 
-                print("Joystick y:", clamped_mousey)
-
                 gamepad.left_joystick(x_value=0, y_value=clamped_mousey)
                 gamepad.update()
+
+                print("Joystick y:", clamped_mousey)
+
+                self.update_input_display.emit(clamped_mousey)
 
                 # Schedule next run
                 next_time += 1.0 / pollRate
@@ -172,7 +176,7 @@ class MainWindow(QWidget):
 
         # Thread + Mouse
         self.worker = JoystickWorker()
-        self.worker.update_input.connect(self.update_curve_input)
+        self.worker.update_graph_input_display.connect(self.update_curve_input)
 
         self.raw_listener = RawMouseListener()
         self.raw_listener.delta_signal.connect(self.update_mouse_delta)
@@ -183,6 +187,10 @@ class MainWindow(QWidget):
         # Group: Tracking Controls
         trackingGroup = QGroupBox("Tracking")
         trackingLayout = QVBoxLayout()
+        self.joystickBar = JoystickBar()
+        trackingLayout.addWidget(self.joystickBar)
+        self.worker.update_input_display.connect(self.update_joystick_bar)
+
         self.startStopButton = QPushButton("Start")
         self.startStopButton.clicked.connect(self.toggleTracking)
         trackingLayout.addWidget(self.startStopButton)
@@ -345,6 +353,9 @@ class MainWindow(QWidget):
             and self.showDotCheckbox.isChecked()
         ):
             self.curveWindow.set_current_input(input_value)
+    
+    def update_joystick_bar(self, input_value: int):
+        self.joystickBar.set_value(input_value)
 
     def updateStartButton(self):
         self.startStopButton.setEnabled(
@@ -452,6 +463,11 @@ class MainWindow(QWidget):
             self.worker.stop_loop()
 
             mouseDeltaY = 0
+
+            if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
+                window.curveWindow.clear_current_input()
+
+            self.update_joystick_bar(0)
 
             print("Tracking stopped via GUI button.")
         else:
@@ -632,6 +648,8 @@ def onPress(key):
 
             if hasattr(window, "curveWindow") and window.curveWindow.isVisible():
                 window.curveWindow.clear_current_input()
+
+            window.update_joystick_bar(0)
 
             window.updateStartStopButtonText()
 
