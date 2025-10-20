@@ -1,7 +1,7 @@
 from typing import override
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QPen, QColor, QMouseEvent, QIcon
-from PyQt6.QtCore import Qt, QPointF
+from PyQt6.QtCore import Qt, QPointF, QSize
 
 
 class CurveEditorWindow(QWidget):
@@ -9,7 +9,7 @@ class CurveEditorWindow(QWidget):
         super().__init__(parent)
         self.setWindowTitle("Sensitivity Curve Editor")
         self.setWindowIcon(QIcon("./resources/curve.ico"))
-        self.setMinimumSize(500, 550)
+        self.setMinimumSize(480, 550)
 
         self.curve_mapping = []
         self.dirty = True
@@ -30,6 +30,9 @@ class CurveEditorWindow(QWidget):
         ]
 
         self.setMouseTracking(True)
+
+    def sizeHint(self) -> QSize:
+        return QSize(480, 550)
 
     def serialize_points(self):
         """Convert QPointF list into serializable list of tuples."""
@@ -72,12 +75,12 @@ class CurveEditorWindow(QWidget):
         painter.setPen(QPen(self.palette().text().color()))
         painter.drawText(
             self.margin,
-            self.margin + self.graph_height + 30,
+            self.margin + self.graph_height + 45,
             "Left-click + drag to move. Double-click to add. Right-click to delete.",
         )
         painter.drawText(
             self.margin,
-            self.margin + self.graph_height + 50,
+            self.margin + self.graph_height + 65,
             "Keep window open to apply curve.",
         )
 
